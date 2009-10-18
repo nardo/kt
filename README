@@ -1,1 +1,27 @@
-Testing git...
+Initial public release of the kt prototype language interpreter.
+
+directory structure overview:
+
+parser:
+	parser executable - comprised of a simple python module that
+	bridges in a custom lexical analyzer build with flex and a bison
+	based parser.
+
+interpreter:
+	the bulk of the kt language platform prototype - program structure and
+	semantic analysis, compilation to intermediate language representation
+	and virtual machine.
+
+test:
+	test cases for various language features.
+
+license:
+	source code licensing information.  Initial version released under MIT
+	license (http://www.opensource.org/licenses/mit-license.php)
+
+media:
+	media/branding around language and environment.
+
+To test it all out, just run the test.sh in the root directory - it will
+build the parser and execute the first unit test which should echo a bunch
+of debug messages and a simple greeting.
