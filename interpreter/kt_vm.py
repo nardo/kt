@@ -16,10 +16,26 @@ class fatal_error:
         
 class vm:
     class object_instance:
-        def __init__(self, compound_info):
-            self.id = compound_info
-            self.slots = [None for x in range(0, compound_info.slot_count)]
-            
+        def __init__(self, node):
+            self.id = node.compound_record
+            self.slots = [None for x in range(0, node.compound_record.slot_count)]
+    class class_instance:
+        def __init__(self, node):
+            pass
+    class function_instance:
+        def __init__(self, node):
+            self.func_record = node.func_record
+            self.container_index = node.container.global_index
+        def eval(self, vm):
+            return ('func_rec', self.func_record, vm.globals[self.container_index])
+    class python_function_instance:
+        def __init__(self, node):
+            self.python_function = node.python_function
+        def eval(self, vm):
+            return ('py_func', self.python_function)
+    class python_class_instance:
+        def __init__(self, node):
+            self.python_class = node.python_class
     class frame:
         def __init__(self, function_record, arguments, prev_frame, reference_object):
             register_count = function_record.register_count
@@ -35,22 +51,28 @@ class vm:
         self.exec_table = build_jump_table(vm, "_exec_")
         self.eval_table = build_jump_table(vm, "_eval_")
         self.evallvalue_table = build_jump_table(vm, "_evallvalue_")
-        self.objects = []
-        for o in (o for o in compiled_image.globals_list if o.type == 'object'):
-            o.index = len(self.objects)
-            self.objects.append(vm.object_instance(o.compound_record)) 
+        self.globals = []
+        for o in compiled_image.globals_list:
+            if o.type == 'object':
+                the_global_object = vm.object_instance(o)
+            elif o.type == 'class':
+                the_global_object = vm.class_instance(o)
+            elif o.type == 'function':
+                the_global_object = vm.function_instance(o)
+            elif o.type == 'python_function':
+                the_global_object = vm.python_function_instance(o)
+            elif o.type == 'python_class':
+                the_global_object = vm.python_class_instance(o)
+            else:
+                raise fatal_error, (self, "unknown global object type " + o.type )
+            self.globals.append(the_global_object)
         self.image = compiled_image
         self.tos = None
         self.return_value = None
         
     def exec_function(self, func_name, args):
         func_node = self.image.find_node(None, func_name, lambda x: x.type =='function' )
-        func_rec = func_node.func_record
-        print "calling function " + func_name + str(args)
-        print str(func_rec)
-        obj_index = func_node.container.index
-        obj = self.objects[obj_index]
-        self.call_function(('func_rec', func_rec, self.objects[obj_index]), args)
+        self.call_function(self.globals[func_node.global_index].eval(self), ())
     
     def call_function(self, callable, arguments):
         if callable[0] == 'func_rec':
@@ -194,15 +216,7 @@ class vm:
         self.tos = save_top
         return result
     def _eval_global_node(self, node):
-        print "global_node: "
-        node.dump()
-        if node.type == 'function':
-            func_rec = node.func_record
-            obj_index = node.container.index
-            obj = self.objects[obj_index]
-            return ('func_rec', func_rec, obj)
-        elif node.type == 'python_function':
-            return ('py_func', node.python_function)
+        return self.globals[node.global_index].eval(self)
     def _eval_sub_function(self, sub_function_index):
         # callables are (function_record, reference_object) pairs
         return ('func_rec', self.image.functions[sub_function_index], self.tos)

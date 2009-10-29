@@ -42,6 +42,8 @@ def test():
 	except compile_error, err:
 		traceback.print_exc()
 		print "Compile ERROR DUDE!!: " + err.error_string
-		
+	except fatal_error, err:
+		traceback.print_exc()
+		print "Fatal: " + err.error_string
 		
 test()
