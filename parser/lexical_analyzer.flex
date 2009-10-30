@@ -92,6 +92,7 @@ public:
 		_depth_stack[0] = 0;
 		_indent_error = false;
 		_line_index = 1;
+		_trailing_return_emitted = 0;
 
 		_parse_string = parse_string;
 		_parse_string_len = parse_string_len;
@@ -124,10 +125,17 @@ protected:
 			max_bytes = max_size;
 		memcpy(buf, _parse_string + _parse_string_index, max_bytes);
 		_parse_string_index += max_bytes;
+		if(max_bytes == 0 && !_trailing_return_emitted)
+		{
+			buf[0] = '\n';
+			_trailing_return_emitted = 1;
+			return 1;
+		}
 		return max_bytes;
 	}
 
 private:
+	int _trailing_return_emitted;
 	uint _line_index;
 	parse_node_ptr *_lvalue;
 	YYLTYPE *_l_loc;
@@ -362,21 +370,6 @@ COMMENT		"//"[^\n\r]*
 	return _END_TOK();
 }
  
- /* Here we deal with hanging indentation at the end of a file. */
- /* If the file ends still indented, emit dedent tokens */
-<<EOF>> {
-	if(_depth_stack[_depth_stack_size - 1] == 0)
-	{
-		// since we overrode the default EOF rule, we must explicitly terminate.
-		yyterminate();
-	}
-	else
-	{
-		_depth_stack_size --;
-		return _DEDENT();
-	}
-}
-
  /* ignore all other whitespace */
 {WHITESPACE}+	{ } 
 
