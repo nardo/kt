@@ -741,7 +741,7 @@ fragmented_string
            field(frag, value, $1);
            field($$, left, frag);
            field($$, right, $2);
-           field($$, op, integer(0));
+		   field($$, op, string("cat_none"));
 		  }
 		  else
 		  {
@@ -775,7 +775,7 @@ fragment_or_ident_list
          field(frag, value, $2);
          field($$, left, $1);
          field($$, right, frag);
-         field($$, op, integer(0));
+		 field($$, op, string("cat_none"));
       }
 	| fragment_or_ident_list IDENTIFIER
 		{
@@ -784,7 +784,7 @@ fragment_or_ident_list
          YYSTYPE ident = node(locator_expr);
          field(ident, string, $2);
          field($$, right, ident);
-         field($$, op, integer(0));
+		 field($$, op, string("cat_none"));
       }
 	;
 	

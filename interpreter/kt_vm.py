@@ -19,6 +19,8 @@ class vm:
         def __init__(self, node):
             self.id = node.compound_record
             self.slots = [None for x in range(0, node.compound_record.slot_count)]
+        def eval(self, vm):
+            return self
     class class_instance:
         def __init__(self, node):
             pass
@@ -69,7 +71,11 @@ class vm:
         self.image = compiled_image
         self.tos = None
         self.return_value = None
-        
+        for o in (o for o in compiled_image.globals_list if o.type == 'object'):
+            if o.constructor_index is not None:
+                callable = ('func_rec', compiled_image.functions[o.constructor_index], self.globals[o.global_index])
+                self.call_function(callable, ())
+                
     def exec_function(self, func_name, args):
         func_node = self.image.find_node(None, func_name, lambda x: x.type =='function' )
         self.call_function(self.globals[func_node.global_index].eval(self), ())
@@ -209,6 +215,8 @@ class vm:
         return self.tos.arguments[arg_index]
     def _evallvalue_local(self, local_index):
         return (self.tos.registers, local_index)
+    def _evallvalue_ivar(self, ivar_index):
+        return (self.tos.reference_object.slots, ivar_index)
     def _eval_prev_scope(self, prev_scope_node):
         save_top = self.tos
         self.tos = self.tos.reference_object
@@ -250,6 +258,20 @@ class vm:
         method = reference_object.id.vtable[imethod_index]
         print "imethod: " + str(reference_object) + " " + str(method)
         return ('func_rec', method, reference_object) 
+    def _eval_ivar(self, ivar_index):
+        return self.tos.reference_object.slots[ivar_index]
+
+    #slot_expr
+    #   object_expr
+    #   slot_name
+    def _eval_slot(self, object_expr, slot_name):
+        the_object = self.eval(object_expr)
+        the_slot = the_object.id.members[slot_name]
+        if the_slot.type == 'variable':
+            return the_object.slots[the_slot.index]
+        elif the_slot.type == 'function':
+            return ('func_rec', the_object.id.vtable[the_slot.index], the_object)
+
   
 # because I'm an optimization nerd.        
 
@@ -281,9 +303,6 @@ class vm:
     #func_call_expr
     #   func_expr
     #   args
-    #slot_expr
-    #   object_expr
-    #   slot_name
     #unary_lvalue_op_expr
     #   expression
     #   op

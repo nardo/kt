@@ -48,6 +48,8 @@ class image:
 		def __init__(self, container, name, type, decl):
 			self.container = container
 			self.contents = {}
+			self.assignments = []
+			self.constructor_index = None
 			self.name = name
 			self.type = type
 			self.decl = decl
@@ -90,11 +92,6 @@ class image:
 		def __str__(self):
 			return "(" + self.type + " " + self.name + ": " + str((self.index, self.global_function_index, self.type_index)) + ")"
 		
-	class slot_assignment:
-		def __init__(self, slot_index, assign_expr):
-			self.slot_index = slot_index
-			self.assign_expr = assign_expr
-
 	class func_record:
 		def __init__(self, decl, node, node_vtable_index):
 			self.decl = decl
@@ -127,24 +124,39 @@ class image:
 			new_info.copy_from(node.compound_record)
 			node.compound_record = new_info
 
-	def add_slot(self, node, slot):
+	def add_slot(self, node, element):
 		self.check_compound_record_unique(node)
 		info = node.compound_record
-		slot.index = info.slot_count
+		the_slot = self.find_slot(node, element.name)
+		if the_slot:
+			raise compile_error, (element.decl, "Variable " + element.name + " already declared.")
+		slot_index = info.slot_count
+		the_slot = image.slot(type='variable',name = element.name, index=slot_index, type_index=self.get_type_spec(element.decl))
+		info.members[the_slot.name] = the_slot
 		info.slot_count += 1
-		info.members[slot.name] = slot
+		
+		if(element.decl['assign_expr'] != None):
+			self.add_constructor_assignment(node, the_slot.name, element.decl['assign_expr'])
+
 	def find_slot(self, node, slot_name):
 		return node.compound_record.members[slot_name] if slot_name in node.compound_record.members else None
-
-	def add_slot_assignment(self, node, slot, assign_expr):
-		assignment = image.slot_assignment(slot.index, assign_expr)
-		node.assignments.append(assignment)
 
 	def add_sub_function_record(self, decl):
 		function_index = len(self.functions)
 		record = image.func_record(decl, None, None)
 		self.functions.append(record)
 		return function_index
+	
+	def add_constructor_assignment(self, node, slot_name, assignment_expression):
+		node.assignments.append((slot_name, assignment_expression))
+	def build_constructor(self, node):
+		if len(node.assignments) != 0:
+			node.constructor_index = len(self.functions)
+			statements = [{'type' : 'expression_stmt', 'expr': {'type': 'assign_expr', 'left':{'type':'locator_expr','string':e[0]}, 'right':e[1]}} for e in node.assignments]
+			decl = {'type': 'function', 'name' : '__constructor', 'parameter_list': (), 'statements' : statements }
+			the_func_record = image.func_record(decl, node, None)
+			self.functions.append(the_func_record)
+			self.analyze_function(the_func_record, None)
 	
 	def add_function_decl(self, node, func_node):
 		if func_node.func_record is not None:
@@ -169,6 +181,7 @@ class image:
 			function_index = len(self.functions)
 			func_node.func_record = image.func_record(decl, node, vtable_index)
 			self.functions.append(func_node.func_record)
+
 		node.compound_record.members[decl['name']] = image.slot(type='function', name=decl['name'],index=vtable_index,global_function_index=function_index)
 		if vtable_index == len(node.compound_record.vtable):
 			node.compound_record.vtable.append(self.functions[function_index])
@@ -253,6 +266,7 @@ class image:
 			self.globals[item.name].append(item)
 		else:
 			self.globals[item.name] = [item]
+
 		item.global_index = len(self.globals_list)
 		self.globals_list.append(item)
 	
@@ -340,12 +354,7 @@ class image:
 			# first add any new functions and variable declarations 
 			for element in node.contents.values():
 				if element.type == 'variable':
-					the_slot = node.find_slot(element.name)
-					if the_slot:
-						raise compile_error, (element.decl, "Variable " + element.name + " already declared.")
-					the_slot = self.add_slot(node, image.slot(type='variable',name = element.name, index=slot_index, type_spec=self.get_type_spec(element.decl)))
-					if(element.decl['assign_expr'] != None):
-						self.add_slot_assignment(the_slot, element.decl['assign_expr'] )
+					self.add_slot(node, element)
 				elif element.type == 'function':
 					self.add_function_decl(node, element)
 					
@@ -358,12 +367,13 @@ class image:
 						the_slot = node.members[assignment['name']]
 						if the_slot.type != 'variable':
 							raise compile_error, (node.decl, "Member " + assignment['name'] + " of " + node.name + " is not an assignable slot.")
-						node.assignments.append( image.slot_assignment(the_slot.slot_index, assignment['assign_expr']) )
+						self.add_constructor_assignment(node, the_slot.name, assignment['assign_expr'])
 			print "Compound " + node.name + ":"
 			for slot_name, the_slot in node.compound_record.members.iteritems():
 				print the_slot
-			for assignment in node.assignments:
-				print "  Assigns variable slot: " + str(assignment.slot_index) + " assign: " + str(assignment.assign_expr)
+			#for assignment in node.assignments:
+			#	print "  Assigns variable slot: " + str(assignment.slot_index) + " assign: " + str(assignment.assign_expr)
+			self.build_constructor(node)
 			print "node " + node.name + " processed - booyaka"
 
 
@@ -706,17 +716,20 @@ class image:
 	def _analyze_expr_strcat_expr(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr['left'], ('string'), False)
 		self.analyze_expression(si, expr['right'], ('string'), False)
-	def get_cat_str(self, str_op):
+	def get_cat_str(self, expr):
+		str_op = expr['op']
 		if str_op == 'cat_none':
 			return ""
 		elif str_op == 'cat_newline':
 			return "\n"
 		elif str_op == 'cat_space':
 			return " "
-		elif op == 'cat_tab':
+		elif str_op == 'cat_tab':
 			return "\t"
+		else:
+			raise compile_error, (expr, "Unknown string cat operator" + str(str_op))
 	def _compile_expr_strcat_expr(self, si, expr, valid_types, is_lvalue):
-		return ('strcat', self.get_cat_str(expr['op']), 
+		return ('strcat', self.get_cat_str(expr), 
 			    self.compile_expression(si, expr['left'], ('string'), False),
 			    self.compile_expression(si, expr['right'], ('string'), False))
 
