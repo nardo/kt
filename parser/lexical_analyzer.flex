@@ -9,6 +9,7 @@
 %option 8bit
 %option batch
 %option yyclass="kt_lexer"
+%option noyywrap
 %pointer
 
 %{
