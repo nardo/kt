@@ -16,11 +16,8 @@
 // %option debug
 
 #define YSSTYPE parse_node_ptr
-#define yywrap kt_wrap
 #include "kt.h"
 #include "parser.hpp"
-
-int kt_wrap();
 
 // #define FLEX_DEBUG 1
 
@@ -481,11 +478,6 @@ COMMENT		"//"[^\n\r]*
 <str>\"					{ BEGIN(INITIAL); return(STRING_END); }
 
 %%
-
-int kt_wrap()
-{
-	return 1;
-}
 
 extern int kt_parse(kt_lexer *lexer, parse_result *result);
 
