@@ -5,10 +5,10 @@ LDFLAGS=-lpython2.5 -lstdc++
 parser: main.o parser.o lexical_analyzer.o
 	$(CC) -o $@ $(LDFLAGS) $^
 
-main.o:
+main.o: main.cpp parser_interface.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ -c main.cpp
 
-parser.o: parser.cpp
+parser.o: parser.cpp parser_interface.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ -c parser.cpp
 
 parser.cpp: parser.bison

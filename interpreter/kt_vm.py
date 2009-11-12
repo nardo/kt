@@ -258,6 +258,10 @@ class vm:
         method = reference_object.id.vtable[imethod_index]
         print "imethod: " + str(reference_object) + " " + str(method)
         return ('func_rec', method, reference_object) 
+    def _eval_selfmethod_global(self, global_index):
+        reference_object = self.tos.reference_object
+        method = self.image.functions[global_index]
+        return ('func_rec', method, reference_object)
     def _eval_ivar(self, ivar_index):
         return self.tos.reference_object.slots[ivar_index]
 

@@ -22,6 +22,7 @@ struct parse_node
 		type_list,
 	};
 	const char *name;
+	parse_node *first;
 	parse_node *next;
 	parse_node_property *property_list_head;
 	parse_node_property *property_list_tail;
@@ -34,10 +35,10 @@ struct parse_node
 	
 	void append(parse_node *node)
 	{
-		parse_node *walk;
-		for(walk = this; walk->next; walk = walk->next)
+		parse_node **walk;
+		for(walk = &first; *walk; walk = &((*walk)->next))
 			;
-		walk->next = node;
+		*walk = node;
 	}
 
 	inline void set_property(parse_result *result, const char *property_name, parse_node *property_value);
@@ -67,7 +68,7 @@ struct parse_result
 	{
 		parse_node *ret = _alloc_node();
 		ret->type = parse_node::type_list;
-		ret->next = first_element;
+		ret->first = first_element;
 		return ret;
 	}
 	
@@ -156,7 +157,7 @@ private:
 				break;
 			case parse_node::type_list:
 				printf("( ");
-				for(parse_node *walk = node->next; walk; walk = walk->next)
+				for(parse_node *walk = node->first; walk; walk = walk->next)
 				{
 					_dump_node(walk, depth + 2);
 					printf(", ");
@@ -172,6 +173,7 @@ private:
 		parse_node *ret = (parse_node *) allocate(sizeof(parse_node));
 		ret->name = 0;
 		ret->next = 0;
+		ret->first = 0;
 		ret->property_list_head = ret->property_list_tail = 0;
 		ret->string_data = 0;
 		ret->string_data_len = 0;

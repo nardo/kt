@@ -37,7 +37,7 @@ PyObject *kt_build_pyobject_tree(parse_node *tree)
 			return PyString_FromString(tree->string_data);
 		case parse_node::type_list:
 			ret = PyList_New(0);
-			for(parse_node *walk = tree->next; walk; walk = walk->next)
+			for(parse_node *walk = tree->first; walk; walk = walk->next)
 				PyList_Append(ret, kt_build_pyobject_tree(walk));
 			return ret;
 	}

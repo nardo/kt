@@ -78,7 +78,7 @@ class image:
 		
 		def copy_from(self, the_info):
 			self.members = the_info.members.copy()
-			self.vtable = the_info.vtable.copy()
+			self.vtable = [x for x in the_info.vtable]
 			self.slot_count = the_info.slot_count
 			self.vtable_count = the_info.vtable_count
 
@@ -136,7 +136,7 @@ class image:
 		info.slot_count += 1
 		
 		if(element.decl['assign_expr'] != None):
-			self.add_constructor_assignment(node, the_slot.name, element.decl['assign_expr'])
+			self.add_constructor_assignment(node, the_slot.index, element.decl['assign_expr'])
 
 	def find_slot(self, node, slot_name):
 		return node.compound_record.members[slot_name] if slot_name in node.compound_record.members else None
@@ -147,13 +147,20 @@ class image:
 		self.functions.append(record)
 		return function_index
 	
-	def add_constructor_assignment(self, node, slot_name, assignment_expression):
-		node.assignments.append((slot_name, assignment_expression))
+	def add_constructor_assignment(self, node, slot_index, assignment_expression):
+		node.assignments.append((slot_index, assignment_expression))
 	def build_constructor(self, node):
 		if len(node.assignments) != 0:
 			node.constructor_index = len(self.functions)
-			statements = [{'type' : 'expression_stmt', 'expr': {'type': 'assign_expr', 'left':{'type':'locator_expr','string':e[0]}, 'right':e[1]}} for e in node.assignments]
-			decl = {'type': 'function', 'name' : '__constructor', 'parameter_list': (), 'statements' : statements }
+			parent = node.parent_node
+			if parent != None and parent.constructor_index != None:
+				parent_call = node.decl['parent_decl']
+				parent_constructor_stmt = [{'type': 'expression_stmt', 'expr': { 'type': 'func_call_expr', 'func_expr': { 'type': 'selfmethod_global_expr', 'func_index': parent.constructor_index }, 'args': parent_call[1] }} ]
+			else:
+				parent_constructor_stmt = []
+			statements = parent_constructor_stmt + [{'type' : 'initializer_stmt', 'slot':e[0], 'value':e[1]} for e in node.assignments]
+			param_list = node.decl['parameter_list'] if 'parameter_list' in node.decl else ()
+			decl = {'type': 'function', 'name' : '__constructor', 'parameter_list': param_list, 'statements' : statements }
 			the_func_record = image.func_record(decl, node, None)
 			self.functions.append(the_func_record)
 			self.analyze_function(the_func_record, None)
@@ -237,7 +244,7 @@ class image:
 		# now add all the files and directories to the tree and recurse them:
 		for file in (f for f in files_and_dirs if f.name not in reject_list):
 			parent = 'resource' if file.type == 'resource' else 'directory'
-			decl = { 'name' : file.name, 'type' : 'object', 'body' : [], 'parent_decl' : parent, 'file_node' : file }
+			decl = { 'name' : file.name, 'type' : 'object', 'body' : [], 'parent_decl' : [parent], 'file_node' : file }
 			image_node.contents[file.name] = image.tree_node(image_node, file.name, 'object', decl)		
 		for decl in decls_list:
 			if decl['name'] in image_node.contents:
@@ -277,7 +284,7 @@ class image:
 			if node.contents.has_key(path[0]):
 				node = node.contents[path[0]]
 			else:
-				decl = { 'name' : path[0], 'type' : 'object', 'body' : [], 'parent_decl' : 'directory' }
+				decl = { 'name' : path[0], 'type' : 'object', 'body' : [], 'parent_decl' : ['directory'] }
 				new_node = image.tree_node(node, path[0], 'object', decl)
 				node.contents[path[0]] = new_node
 				node = new_node
@@ -331,7 +338,7 @@ class image:
 			node.process_pass = 1
 			# check if it has a parent class, and process that one first.
 			print "Processing compound: " + node.name + " with decl: " + str(node.decl)
-			parent = node.decl['parent_decl'] if 'parent_decl' in node.decl else None
+			parent = node.decl['parent_decl'][0] if 'parent_decl' in node.decl and len(node.decl['parent_decl']) > 0 else None
 			if parent != None:
 				print "node: " + node.name + " has parent: " + parent
 				parent_node = self.find_node(node, parent)
@@ -367,7 +374,7 @@ class image:
 						the_slot = node.members[assignment['name']]
 						if the_slot.type != 'variable':
 							raise compile_error, (node.decl, "Member " + assignment['name'] + " of " + node.name + " is not an assignable slot.")
-						self.add_constructor_assignment(node, the_slot.name, assignment['assign_expr'])
+						self.add_constructor_assignment(node, the_slot.index, assignment['assign_expr'])
 			print "Compound " + node.name + ":"
 			for slot_name, the_slot in node.compound_record.members.iteritems():
 				print the_slot
@@ -587,6 +594,13 @@ class image:
 	def _compile_stmt_expression_stmt(self, si, stmt, continue_ip, break_ip):
 		si.statements.append(('eval', self.compile_void_expression(si, stmt['expr'])))
 	
+	def _analyze_stmt_initializer_stmt(self, si, stmt):
+		self.analyze_expression(si, stmt['value'], ('any'), False)
+		si.ip += 1
+	def _compile_stmt_initializer_stmt(self, si, stmt, continue_ip, break_ip):
+		si.statements.append(('eval', ('assign', ('ivar', stmt['slot']),
+									   self.compile_expression(si, stmt['value'], ('any'), False) )))
+
 	def compile_boolean_expression(self, si, expr):
 		return self.compile_expression(si, expr, ('boolean'), False)
 
@@ -600,6 +614,7 @@ class image:
 		#print "Analyzing expression: " + str(expr)
 		if is_lvalue and expr['type'] not in ('locator_expr', 'array_index_expr', 'slot_expr'):
 			raise compile_error, (expr, "Expression is not an l-value.")
+		print str(expr)
 		if expr['type'] in self.analyze_expr_jump_table:
 			self.analyze_expr_jump_table[expr['type']](self, si, expr, valid_types, is_lvalue)
 		
@@ -608,6 +623,9 @@ class image:
 			return self.compile_expr_jump_table[expr['type']](self, si, expr, valid_types, is_lvalue)
 		else:
 			return expr
+		
+	def _compile_expr_selfmethod_global_expr(self, si, expr, valid_types, is_lvalue):
+		return ('selfmethod_global', expr['func_index'])
 	
 	def _analyze_expr_locator_expr(self, si, expr, valid_types, is_lvalue):
 		locator_name = expr['string']

@@ -191,7 +191,7 @@ is_public
 
 declaration_parameters
 	:
-		{ $$ = nil; }
+		{ $$ = empty_list(); }
 	| '(' optional_parameter_list ')'
 		{ $$ = $2; }
 	;
@@ -212,9 +212,11 @@ parameter_list
 
 parent_specifier
 	:
-		{ $$ = nil; }
+		{ $$ = list(nil); }
 	| ':' locator
-		{ $$ = $2; }
+		{ $$ = list($2); }
+	| ':' locator '(' expression_list ')'
+		{ $$ = list($2); append($$, $4); }
 	;
 
 locator
