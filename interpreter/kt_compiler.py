@@ -46,6 +46,7 @@ class image:
 
 	class tree_node:
 		def __init__(self, container, name, type, decl):
+			self.parent_node = None
 			self.container = container
 			self.contents = {}
 			self.assignments = []
@@ -348,8 +349,6 @@ class image:
 					print "processing parent: " + parent_node.name
 					self.analyze_compound(parent_node)
 				node.parent_node = parent_node
-			else:
-				node.parent_node = None
 			node.process_pass = 2
 			# now that the parent node is processed, we can process this node
 			node.assignments = []
@@ -683,9 +682,26 @@ class image:
 		return ('func_call', self.compile_expression(si, expr['func_expr'], ('callable'), False), arg_array)
 		
 	def _analyze_expr_slot_expr(self, si, expr, valid_types, is_lvalue):
-		self.analyze_expression(si, expr['object_expr'], ('any'), False)
+		object_expr = expr['object_expr']
+		if(object_expr['type'] == 'locator_expr' and object_expr['string'] == 'parent'):
+			# parent references a function slot in the parent class
+			parent_node = si.compound_node.parent_node
+			if parent_node == None:
+				raise compile_error, (expr, "Compound " + si.compound_node.name + " has no declared parent.")
+			parent_record = parent_node.compound_record
+			if expr['slot_name'] not in parent_record.members:
+				raise compile_error, (expr, "Parent of " + si.compound_node.name + " has no member named " + expr['slot_name'])
+			slot = parent_record.members[expr['slot_name']]
+			if slot.type != 'function':
+				raise compile_error, (expr, "parent expression must reference a function.")				
+			expr['parent_function_index'] = slot.global_function_index
+ 		else:
+ 			self.analyze_expression(si, expr['object_expr'], ('any'), False)
 	def _compile_expr_slot_expr(self, si, expr, valid_types, is_lvalue):
-		return ('slot', self.compile_expression(si, expr['object_expr'], ('any'), False), expr['slot_name'])
+		if 'parent_function_index' in expr:
+			return ('selfmethod_global', expr['parent_function_index'])
+		else:
+			return ('slot', self.compile_expression(si, expr['object_expr'], ('any'), False), expr['slot_name'])
 	
 	def _analyze_expr_unary_lvalue_op_expr(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr['expression'], ('number'), True)
