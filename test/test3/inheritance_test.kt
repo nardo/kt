@@ -15,5 +15,25 @@ object the_object : test_subclass(10, 20)
 		parent.do_print()
 		print("X = $x, Y = $y, Z = $z")
 
+object container
+	object sub_object1
+		var x = 10
+		var y = 10
+	object sub_object2
+		function do_print()
+			print("X = " @ sub_object1.x @ " Y = " @ sub_object1.y)
+
+object container2
+	object sub_object1
+		var x = 20
+		var y = 20
+	object sub_object2
+		function do_print()
+			print("X = " @ sub_object1.x @ " Y = " @ sub_object1.y)
+
+
 function main()
 	the_object.do_print()
+	'container/sub_object2'.do_print()
+	sub_object2.do_print()
+	'container2/sub_object2'.do_print()

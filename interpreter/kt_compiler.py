@@ -13,6 +13,9 @@ class compile_error:
 		self.node_where = node_where
 		self.error_string = error_string
 
+def compiler_warning(node_where, warning_string):
+	print "Warning!: " + warning_string
+
 compound_node_types = ('object', 'class', 'struct')
 
 def iterate_tree(t):
@@ -28,6 +31,13 @@ def build_jump_table(the_object, prefix):
             split_string = pair[0].partition(prefix)
             the_map[split_string[2]] = pair[1]
     return the_map
+
+def common_list_length(list1, list2):
+	i = 0
+	while i < len(list1) and i < len(list2) and list1[i] == list2[i]:
+		i += 1
+	return i
+
 
 class image:
 	def __init__(self, file_tree, image_name):
@@ -68,6 +78,11 @@ class image:
 			return self.type in compound_node_types
 		def is_function(self):
 			return self.type == 'function'
+		def get_ancestry_list(self):
+			if self.container is None:
+				return [self]
+			else:
+				return self.container.get_ancestry_list() + [self]
 	
 	class compound_record:
 		def __init__(self, origin_node):
@@ -323,12 +338,26 @@ class image:
 						break
 				if leaf_node != None and filter_func(leaf_node):
 				   node_list.append(leaf_node)
-			# todo: if there's more than one element in the node_list, find the one that's the closest relative of search_node
-			# for now, just return the first element of the list or None if the search came up empty
 			if len(node_list) == 0:
 				return None
-			else:
+			elif len(node_list) == 1:
 			    return node_list[0]
+			else:
+				# figure out which is the closest relative to search_node
+				search_ancestry = search_node.get_ancestry_list()
+				node_ancestry = node_list[0].get_ancestry_list()
+				closest_ancestry_depth = common_list_length(search_ancestry, node_ancestry)
+				closest_node = node_list[0]
+				for n in node_list[1:]:
+					node_ancestry = n.get_ancestry_list()
+					depth = common_list_length(search_ancestry, node_ancestry)
+					if depth > closest_ancestry_depth:
+						closest_node = n
+						closest_ancestry_depth = depth
+					elif depth == closest_ancestry_depth:
+						compiler_warning(None, "Node " + parent_name + " ambiguously resolves to multiple objects at same depth.")
+				return closest_node				
+
 	def get_type_spec(self, var_decl):
 		return 0
 	
