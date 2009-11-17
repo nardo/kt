@@ -579,11 +579,12 @@ statement_block
    ;
 
 switch_statement
-   : "switch" expression end_token INDENT switch_list DEDENT
+   : "switch" expression end_token INDENT switch_list optional_default DEDENT
       {
          $$ = node(switch_stmt);
-         field($$, test_expression, $3);
-         field($$, element_list, $6);
+         field($$, test_expression, $2);
+         field($$, element_list, $5);
+		 field($$, default_block, $6);
       }
    ;
 
@@ -593,9 +594,16 @@ switch_list
 	| switch_list switch_element
 		{ $$ = $1; append($1, $2); }
 	;
+	
+optional_default
+	:
+		{ $$ = nil; }
+	| "default" end_token statement_block
+		{ $$ = $3; }
+	;
 
 switch_element
-	: switch_label_list non_empty_statement_list
+	: switch_label_list statement_block
 		{
          $$ = node(switch_element);
          field($$, label_list, $1);
@@ -620,10 +628,9 @@ constant_atom
 			$$ = node(float_constant_expr);
 			field($$, value, $1);
 		}
-	| STRING_FRAGMENT
+	| fragmented_string
 		{
-			$$ = node(string_constant_expr);
-			field($$, value, $1);
+			$$ = $1;
 		}
 	| IDENTIFIER
 		{
@@ -638,8 +645,6 @@ switch_label
 			$$ = node(switch_label);
 			field($$, test_constant, $2);
 		}
-	| "default" end_token
-		{ $$ = node(switch_label); }
 	;
 
 if_statement

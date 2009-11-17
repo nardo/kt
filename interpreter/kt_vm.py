@@ -9,6 +9,10 @@ Exec_Normal = 0
 Exec_Return = 1
 Exec_Exception = 2
 
+def spew(str):
+	pass
+	#print str
+	
 class fatal_error:
     def __init__(self, vm, error_string):
         self.vm = vm
@@ -96,7 +100,7 @@ class vm:
 
     def exec_current_instruction(self):
         instruction = self.tos.function_record.statements[self.tos.ip]
-        print "Executing instruction: " + str(instruction)
+        spew("Executing instruction: " + str(instruction))
         return self.exec_table[instruction[0]](self, *instruction[1:])
         
     def _exec_eval(self, expression):
@@ -134,11 +138,11 @@ class vm:
         return Exec_Return
     
     def eval(self, node):
-        print "  " * self.depth + "evaluating node: " + str(node)
+        spew("  " * self.depth + "evaluating node: " + str(node))
         self.depth = self.depth + 1
         return_value = self.eval_table[node[0]](self, *node[1:])
         self.depth = self.depth - 1
-        print "  " * self.depth + "returned " + str(return_value)
+        spew("  " * self.depth + "returned " + str(return_value))
         return return_value
     def eval_lvalue(self, node):
         return self.evallvalue_table[node[0]](self, *node[1:])
@@ -198,8 +202,8 @@ class vm:
 
     def _eval_float_binary(self, op, left, right):
         if op == "add":
-            print "left: " + str(left)
-            print "right: " + str(right)
+            spew("left: " + str(left))
+            spew("right: " + str(right))
             return self.eval(left) + self.eval(right)
         elif op == "subtract":
             return self.eval(left) - self.eval(right)
@@ -233,7 +237,7 @@ class vm:
     def _eval_int_constant(self, value):
         return value
     def _eval_strcat(self, op_str, left, right):
-        print "strcat " + str(left) + " " + str(right)
+        spew("strcat " + str(left) + " " + str(right))
         return str(self.eval(left)) + op_str + str(self.eval(right))
     def _eval_func_call(self, func_expr, args):
         callable = self.eval(func_expr)
@@ -244,7 +248,7 @@ class vm:
         the_array = self.eval(array_expr)
         the_index = self.eval(index_expr)
         
-        print "  " * (self.depth + 1) + str(the_array) + " [ " + str(the_index) + " ] "
+        spew("  " * (self.depth + 1) + str(the_array) + " [ " + str(the_index) + " ] ")
         array_type = type(the_array)
         if array_type == types.ListType or array_type == types.DictType:
             return the_array[the_index]
@@ -256,7 +260,7 @@ class vm:
     def _eval_imethod(self, imethod_index):
         reference_object = self.tos.reference_object
         method = reference_object.id.vtable[imethod_index]
-        print "imethod: " + str(reference_object) + " " + str(method)
+        spew("imethod: " + str(reference_object))
         return ('func_rec', method, reference_object) 
     def _eval_selfmethod_global(self, global_index):
         reference_object = self.tos.reference_object

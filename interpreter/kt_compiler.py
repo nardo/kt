@@ -525,7 +525,48 @@ class image:
 		si.statements.append(('branch_always', break_ip))
 		
 	def _analyze_stmt_switch_stmt(self, si, stmt):
-		print "switch stmt" + str(stmt)
+		# save the expression result in a register
+		stmt['expr_register'] = si.register_count
+		si.register_count += 1
+		si.switch_count += 1
+		# the basic form of the switch statement is to evaluate
+		# the switch expression into the temporary register (first instruction)
+		# then for each switch element there is either a branch test for the cases
+		# followed by a branch always to the default case or out of the switch if there's
+		# no default.
+		si.ip += 2 + len(stmt['element_list'])
+		self.analyze_expression(si, stmt['test_expression'], ('any'), False)
+		for element in stmt['element_list']:
+			for label in element['label_list']:
+				self.analyze_expression(si, label['test_constant'], ('any'), False)
+			self.analyze_block(si, element['statement_list'])
+		if stmt['default_block'] is not None:
+			self.analyze_block(si, stmt['default_block'])
+		stmt['break_ip'] = si.ip
+		si.switch_count -= 1
+		
+	def _compile_stmt_switch_stmt(self, si, stmt, continue_ip, break_ip):
+		switch_start = len(si.statements)
+		test_register = stmt['expr_register']
+		si.statements.append( ('eval', ('assign', ('local', test_register), self.compile_expression(si, stmt['test_expression'], ('any'), False))))
+		# reserve cascading statement list for the test expressions and final branch
+		si.statements = si.statements + [None] * (len(stmt['element_list']) + 1)
+		index = 1
+		def build_compare(expr):
+			return ('bool_binary', 'compare_equal', ('local', test_register ), self.compile_expression(si, expr, ('any'), False))
+			
+		for element in stmt['element_list']:
+			ip = len(si.statements)
+			self.compile_block(si, element['statement_list'], continue_ip, stmt['break_ip'])
+			label_list = element['label_list']
+			compare_expr = build_compare(label_list[0]['test_constant'])
+			for label in label_list[1:]:
+				compare_expr = ('bool_binary', 'logical_or', compare_expr, build_compare(label['test_constant']))
+			si.statements[switch_start + index] = ('branch_if_nonzero', ip, compare_expr)
+			index += 1
+		si.statements[switch_start + index] = ('branch_always', len(si.statements))
+		if stmt['default_block'] is not None:
+			self.compile_block(si, stmt['default_block'], continue_ip, stmt['break_ip'])
 		
 	def _analyze_stmt_if_stmt(self, si, stmt):
 		#print "if stmt" + str(stmt)
