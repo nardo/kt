@@ -4,7 +4,7 @@ function test_switch(value)
 			print("Got hello")
 			break
 		case "world"
-			print("Got World")
+			print("Got world")
 			break
 		case 10
 			print("Got 10, falling through")
