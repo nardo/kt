@@ -6,3 +6,8 @@ object the_object
 
 function main()
 	the_object.do_print()
+	var value = 10
+	print(value == 10 ? "yes, it's 10" : "no, it's not!")
+	var array
+	array = [10, 20, 30]
+	print("This should be 30: " @ array[2])

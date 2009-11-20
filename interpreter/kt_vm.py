@@ -5,391 +5,408 @@
 from kt_compiler import build_jump_table
 import types
 
+should_spew = True
+
 Exec_Normal = 0
 Exec_Return = 1
 Exec_Exception = 2
 
 def spew(str):
-	pass
-	#print str
+	if should_spew:
+		print str
 	
 class fatal_error:
-    def __init__(self, vm, error_string):
-        self.vm = vm
-        self.error_string = error_string
-        
+	def __init__(self, vm, error_string):
+		self.vm = vm
+		self.error_string = error_string
+		
 class vm:
-    class object_instance:
-        def __init__(self, node):
-            self.id = node.compound_record
-            self.slots = [None for x in range(0, node.compound_record.slot_count)]
-        def eval(self, vm):
-            return self
-    class class_instance:
-        def __init__(self, node):
-            pass
-    class function_instance:
-        def __init__(self, node):
-            self.func_record = node.func_record
-            self.container_index = node.container.global_index
-        def eval(self, vm):
-            return ('func_rec', self.func_record, vm.globals[self.container_index])
-    class python_function_instance:
-        def __init__(self, node):
-            self.python_function = node.python_function
-        def eval(self, vm):
-            return ('py_func', self.python_function)
-    class python_class_instance:
-        def __init__(self, node):
-            self.python_class = node.python_class
-    class frame:
-        def __init__(self, function_record, arguments, prev_frame, reference_object):
-            register_count = function_record.register_count
-            self.function_record = function_record
-            self.registers = list((None for i in range(0,register_count)))
-            self.arguments = arguments
-            self.ip = 0
-            self.prev_frame = prev_frame
-            self.reference_object = reference_object
-            
-    def __init__(self, compiled_image):
-        self.depth = 0
-        self.exec_table = build_jump_table(vm, "_exec_")
-        self.eval_table = build_jump_table(vm, "_eval_")
-        self.evallvalue_table = build_jump_table(vm, "_evallvalue_")
-        self.globals = []
-        for o in compiled_image.globals_list:
-            if o.type == 'object':
-                the_global_object = vm.object_instance(o)
-            elif o.type == 'class':
-                the_global_object = vm.class_instance(o)
-            elif o.type == 'function':
-                the_global_object = vm.function_instance(o)
-            elif o.type == 'python_function':
-                the_global_object = vm.python_function_instance(o)
-            elif o.type == 'python_class':
-                the_global_object = vm.python_class_instance(o)
-            else:
-                raise fatal_error, (self, "unknown global object type " + o.type )
-            self.globals.append(the_global_object)
-        self.image = compiled_image
-        self.tos = None
-        self.return_value = None
-        for o in (o for o in compiled_image.globals_list if o.type == 'object'):
-            if o.constructor_index is not None:
-                callable = ('func_rec', compiled_image.functions[o.constructor_index], self.globals[o.global_index])
-                self.call_function(callable, ())
-                
-    def exec_function(self, func_name, args):
-        func_node = self.image.find_node(None, func_name, lambda x: x.type =='function' )
-        self.call_function(self.globals[func_node.global_index].eval(self), ())
-    
-    def call_function(self, callable, arguments):
-        if callable[0] == 'func_rec':
-            function_record = callable[1]
-            reference_object = callable[2]
-            new_frame = vm.frame(function_record, arguments, self.tos, reference_object)
-            self.tos = new_frame
-            result = self.exec_current_instruction()
-            while result == Exec_Normal:
-                result = self.exec_current_instruction()
-            self.tos = self.tos.prev_frame
-            return result
-        elif callable[0] == 'py_func':
-            callable[1](*arguments)
+	class object_instance:
+		def __init__(self, node):
+			self.id = node.compound_record
+			self.slots = [None for x in range(0, node.compound_record.slot_count)]
+		def eval(self, vm):
+			return self
+	class class_instance:
+		def __init__(self, node):
+			pass
+	class function_instance:
+		def __init__(self, node):
+			self.func_record = node.func_record
+			self.container_index = node.container.global_index
+		def eval(self, vm):
+			return ('func_rec', self.func_record, vm.globals[self.container_index])
+	class python_function_instance:
+		def __init__(self, node):
+			self.python_function = node.python_function
+		def eval(self, vm):
+			return ('py_func', self.python_function)
+	class python_class_instance:
+		def __init__(self, node):
+			self.python_class = node.python_class
+	class frame:
+		def __init__(self, function_record, arguments, prev_frame, reference_object):
+			register_count = function_record.register_count
+			self.function_record = function_record
+			self.registers = list((None for i in range(0,register_count)))
+			self.arguments = arguments
+			self.ip = 0
+			self.prev_frame = prev_frame
+			self.reference_object = reference_object
+			
+	def __init__(self, compiled_image):
+		self.depth = 0
+		self.exec_table = build_jump_table(vm, "_exec_")
+		self.eval_table = build_jump_table(vm, "_eval_")
+		self.evallvalue_table = build_jump_table(vm, "_evallvalue_")
+		self.globals = []
+		for o in compiled_image.globals_list:
+			if o.type == 'object':
+				the_global_object = vm.object_instance(o)
+			elif o.type == 'class':
+				the_global_object = vm.class_instance(o)
+			elif o.type == 'function':
+				the_global_object = vm.function_instance(o)
+			elif o.type == 'python_function':
+				the_global_object = vm.python_function_instance(o)
+			elif o.type == 'python_class':
+				the_global_object = vm.python_class_instance(o)
+			else:
+				raise fatal_error, (self, "unknown global object type " + o.type )
+			self.globals.append(the_global_object)
+		self.image = compiled_image
+		self.tos = None
+		self.return_value = None
+		for o in (o for o in compiled_image.globals_list if o.type == 'object'):
+			if o.constructor_index is not None:
+				callable = ('func_rec', compiled_image.functions[o.constructor_index], self.globals[o.global_index])
+				self.call_function(callable, ())
+				
+	def exec_function(self, func_name, args):
+		func_node = self.image.find_node(None, func_name, lambda x: x.type =='function' )
+		self.call_function(self.globals[func_node.global_index].eval(self), ())
+	
+	def call_function(self, callable, arguments):
+		if callable[0] == 'func_rec':
+			function_record = callable[1]
+			reference_object = callable[2]
+			new_frame = vm.frame(function_record, arguments, self.tos, reference_object)
+			self.tos = new_frame
+			result = self.exec_current_instruction()
+			while result == Exec_Normal:
+				result = self.exec_current_instruction()
+			self.tos = self.tos.prev_frame
+			return result
+		elif callable[0] == 'py_func':
+			callable[1](*arguments)
 
-    def exec_current_instruction(self):
-        instruction = self.tos.function_record.statements[self.tos.ip]
-        spew("Executing instruction: " + str(instruction))
-        return self.exec_table[instruction[0]](self, *instruction[1:])
-        
-    def _exec_eval(self, expression):
-        self.eval(expression)
-        self.tos.ip += 1
-        return Exec_Normal
-    
-    def _exec_branch_if_zero(self, branch_target, test_expression):
-        test_result = self.eval(test_expression)
-        if(test_result == 0 or test_result == '\0'):
-            self.tos.ip = branch_target
-        else:
-            self.tos.ip += 1
-        return Exec_Normal
-    
-    def _exec_branch_if_nonzero(self, branch_target, test_expression):
-        if(self.eval(test_expression) != 0):
-            self.tos.ip = branch_target
-        else:
-            self.tos.ip += 1
-        return Exec_Normal
-    
-    def _exec_branch_always(self, branch_target):
-        self.tos.ip = branch_target
-        return Exec_Normal
-    
-    def _exec_return(self, expression_list):
-        list_len = len(expression_list)
-        if list_len == 0:
-            self.return_value = None
-        elif list_len == 1:
-            self.return_value = self.eval(expression_list[0])
-        else:
-            self.return_value = [self.eval(x) for x in expression_list]
-        return Exec_Return
-    
-    def eval(self, node):
-        spew("  " * self.depth + "evaluating node: " + str(node))
-        self.depth = self.depth + 1
-        return_value = self.eval_table[node[0]](self, *node[1:])
-        self.depth = self.depth - 1
-        spew("  " * self.depth + "returned " + str(return_value))
-        return return_value
-    def eval_lvalue(self, node):
-        return self.evallvalue_table[node[0]](self, *node[1:])
-    def store(self, location, value):
-        location[0][location[1]] = value
+	def exec_current_instruction(self):
+		instruction = self.tos.function_record.statements[self.tos.ip]
+		spew("Executing instruction: " + str(instruction))
+		return self.exec_table[instruction[0]](self, *instruction[1:])
+		
+	def _exec_eval(self, expression):
+		self.eval(expression)
+		self.tos.ip += 1
+		return Exec_Normal
+	
+	def _exec_branch_if_zero(self, branch_target, test_expression):
+		test_result = self.eval(test_expression)
+		if(test_result == 0 or test_result == '\0'):
+			self.tos.ip = branch_target
+		else:
+			self.tos.ip += 1
+		return Exec_Normal
+	
+	def _exec_branch_if_nonzero(self, branch_target, test_expression):
+		if(self.eval(test_expression) != 0):
+			self.tos.ip = branch_target
+		else:
+			self.tos.ip += 1
+		return Exec_Normal
+	
+	def _exec_branch_always(self, branch_target):
+		self.tos.ip = branch_target
+		return Exec_Normal
+	
+	def _exec_return(self, expression_list):
+		list_len = len(expression_list)
+		if list_len == 0:
+			self.return_value = None
+		elif list_len == 1:
+			self.return_value = self.eval(expression_list[0])
+		else:
+			self.return_value = [self.eval(x) for x in expression_list]
+		return Exec_Return
+	
+	def eval(self, node):
+		spew("  " * self.depth + "evaluating node: " + str(node))
+		self.depth = self.depth + 1
+		return_value = self.eval_table[node[0]](self, *node[1:])
+		self.depth = self.depth - 1
+		spew("  " * self.depth + "returned " + str(return_value))
+		return return_value
+	def eval_lvalue(self, node):
+		return self.evallvalue_table[node[0]](self, *node[1:])
+	def store(self, location, value):
+		location[0][location[1]] = value
 
-    def _eval_assign(self, left, right):
-        self.store(self.eval_lvalue(left), self.eval(right))
-    def _eval_float_assign(self, op, left, right):
-        loc = self.eval_lvalue(left)
-        
-        index = loc[1]
-        address = loc[0]
-        if op == 'add':
-            address[index] = address[index] + self.eval(right)
-        elif op == 'subtract':
-            address[index] = address[index] - self.eval(right)
-        elif op == 'multiply':
-            address[index] = address[index] * self.eval(right)
-        elif op == 'divide':
-            address[index] = address[index] / self.eval(right)
-        elif op == 'modulus':
-            address[index] = address[index] % self.eval(right)
+	def _eval_assign(self, left, right):
+		self.store(self.eval_lvalue(left), self.eval(right))
+	def _eval_float_assign(self, op, left, right):
+		loc = self.eval_lvalue(left)
+		
+		index = loc[1]
+		address = loc[0]
+		if op == 'add':
+			address[index] = address[index] + self.eval(right)
+		elif op == 'subtract':
+			address[index] = address[index] - self.eval(right)
+		elif op == 'multiply':
+			address[index] = address[index] * self.eval(right)
+		elif op == 'divide':
+			address[index] = address[index] / self.eval(right)
+		elif op == 'modulus':
+			address[index] = address[index] % self.eval(right)
 
-    #bool_binary
-    #   op
-    #       "compare_less"
-    #       "compare_greater"
-    #       "compare_less_or_equal"
-    #       "compare_greater_or_equal"
-    #       "compare_equal"
-    #       "compare_not_equal"
-    #       "logical_and"
-    #       "logical_or"
-    #   left
-    #   right
-    def _eval_bool_binary(self, op, left, right):
-        left_value = self.eval(left)
-        right_value = self.eval(right)
-        if op == "compare_less":
-            return left_value < right_value
-        elif op == "compare_greater":
-            return left_value > right_value
-        elif op == "compare_less_or_equal":
-            return left_value <= right_value
-        elif op == "compare_greater_or_equal":
-            return left_value >= right_value
-        elif op == "compare_equal":
-            return left_value == right_value
-        elif op == "compare_not_equal":
-            return left_value != right_value
-        elif op == "logical_and":
-            return left_value and right_value
-        elif op == "logical_or":
-            return left_value or right_value
-        raise fatal_error(self, "invalid bool_binary comparison op")
+	#bool_binary
+	#   op
+	#	   "compare_less"
+	#	   "compare_greater"
+	#	   "compare_less_or_equal"
+	#	   "compare_greater_or_equal"
+	#	   "compare_equal"
+	#	   "compare_not_equal"
+	#	   "logical_and"
+	#	   "logical_or"
+	#   left
+	#   right
+	def _eval_bool_binary(self, op, left, right):
+		left_value = self.eval(left)
+		right_value = self.eval(right)
+		if op == "compare_less":
+			return left_value < right_value
+		elif op == "compare_greater":
+			return left_value > right_value
+		elif op == "compare_less_or_equal":
+			return left_value <= right_value
+		elif op == "compare_greater_or_equal":
+			return left_value >= right_value
+		elif op == "compare_equal":
+			return left_value == right_value
+		elif op == "compare_not_equal":
+			return left_value != right_value
+		elif op == "logical_and":
+			return left_value and right_value
+		elif op == "logical_or":
+			return left_value or right_value
+		raise fatal_error(self, "invalid bool_binary comparison op")
 
-    def _eval_float_binary(self, op, left, right):
-        if op == "add":
-            spew("left: " + str(left))
-            spew("right: " + str(right))
-            return self.eval(left) + self.eval(right)
-        elif op == "subtract":
-            return self.eval(left) - self.eval(right)
-        elif op == "multiply":
-            return self.eval(left) * self.eval(right)
-        elif op == "divide":
-            return self.eval(left) / self.eval(right)
-        elif op == "modulus":
-            return self.eval(left) % self.eval(right)
-    def _eval_local(self, local_index):
-        return self.tos.registers[local_index]
-    def _eval_arg(self, arg_index):
-        return self.tos.arguments[arg_index]
-    def _evallvalue_local(self, local_index):
-        return (self.tos.registers, local_index)
-    def _evallvalue_ivar(self, ivar_index):
-        return (self.tos.reference_object.slots, ivar_index)
-    def _eval_prev_scope(self, prev_scope_node):
-        save_top = self.tos
-        self.tos = self.tos.reference_object
-        result = self.eval(prev_scope_node)
-        self.tos = save_top
-        return result
-    def _eval_global_node(self, node):
-        return self.globals[node.global_index].eval(self)
-    def _eval_sub_function(self, sub_function_index):
-        # callables are (function_record, reference_object) pairs
-        return ('func_rec', self.image.functions[sub_function_index], self.tos)
-    def _eval_string_constant(self, value):
-        return value
-    def _eval_int_constant(self, value):
-        return value
-    def _eval_strcat(self, op_str, left, right):
-        spew("strcat " + str(left) + " " + str(right))
-        return str(self.eval(left)) + op_str + str(self.eval(right))
-    def _eval_func_call(self, func_expr, args):
-        callable = self.eval(func_expr)
-        evaluated_args = [self.eval(arg) for arg in args]
-        self.call_function(callable, evaluated_args)
-        return self.return_value
-    def _eval_array_index(self, array_expr, index_expr):
-        the_array = self.eval(array_expr)
-        the_index = self.eval(index_expr)
-        
-        spew("  " * (self.depth + 1) + str(the_array) + " [ " + str(the_index) + " ] ")
-        array_type = type(the_array)
-        if array_type == types.ListType or array_type == types.DictType:
-            return the_array[the_index]
-        if array_type == types.StringType:
-            if the_index >= len(the_array):
-                return '\0'
-            return the_array[the_index]
-        pass
-    def _eval_imethod(self, imethod_index):
-        reference_object = self.tos.reference_object
-        method = reference_object.id.vtable[imethod_index]
-        spew("imethod: " + str(reference_object))
-        return ('func_rec', method, reference_object) 
-    def _eval_selfmethod_global(self, global_index):
-        reference_object = self.tos.reference_object
-        method = self.image.functions[global_index]
-        return ('func_rec', method, reference_object)
-    def _eval_ivar(self, ivar_index):
-        return self.tos.reference_object.slots[ivar_index]
+	def _eval_float_binary(self, op, left, right):
+		if op == "add":
+			spew("left: " + str(left))
+			spew("right: " + str(right))
+			return self.eval(left) + self.eval(right)
+		elif op == "subtract":
+			return self.eval(left) - self.eval(right)
+		elif op == "multiply":
+			return self.eval(left) * self.eval(right)
+		elif op == "divide":
+			return self.eval(left) / self.eval(right)
+		elif op == "modulus":
+			return self.eval(left) % self.eval(right)
+	def _eval_local(self, local_index):
+		return self.tos.registers[local_index]
+	def _eval_arg(self, arg_index):
+		return self.tos.arguments[arg_index]
+	def _evallvalue_local(self, local_index):
+		return (self.tos.registers, local_index)
+	def _evallvalue_ivar(self, ivar_index):
+		return (self.tos.reference_object.slots, ivar_index)
+	def _eval_prev_scope(self, prev_scope_node):
+		save_top = self.tos
+		self.tos = self.tos.reference_object
+		result = self.eval(prev_scope_node)
+		self.tos = save_top
+		return result
+	def _eval_global_node(self, node):
+		return self.globals[node.global_index].eval(self)
+	def _eval_sub_function(self, sub_function_index):
+		# callables are (function_record, reference_object) pairs
+		return ('func_rec', self.image.functions[sub_function_index], self.tos)
+	def _eval_string_constant(self, value):
+		return value
+	def _eval_int_constant(self, value):
+		return value
+	def _eval_strcat(self, op_str, left, right):
+		spew("strcat " + str(left) + " " + str(right))
+		return str(self.eval(left)) + op_str + str(self.eval(right))
+	def _eval_func_call(self, func_expr, args):
+		callable = self.eval(func_expr)
+		evaluated_args = [self.eval(arg) for arg in args]
+		self.call_function(callable, evaluated_args)
+		return self.return_value
+	def _eval_array_index(self, array_expr, index_expr):
+		the_array = self.eval(array_expr)
+		the_index = self.eval(index_expr)
+		
+		spew("  " * (self.depth + 1) + str(the_array) + " [ " + str(the_index) + " ] ")
+		array_type = type(the_array)
+		if array_type == types.ListType or array_type == types.DictType:
+			return the_array[the_index]
+		if array_type == types.StringType:
+			if the_index >= len(the_array):
+				return '\0'
+			return the_array[the_index]
+		pass
+	def _eval_imethod(self, imethod_index):
+		reference_object = self.tos.reference_object
+		method = reference_object.id.vtable[imethod_index]
+		spew("imethod: " + str(reference_object))
+		return ('func_rec', method, reference_object) 
+	def _eval_selfmethod_global(self, global_index):
+		reference_object = self.tos.reference_object
+		method = self.image.functions[global_index]
+		return ('func_rec', method, reference_object)
+	def _eval_ivar(self, ivar_index):
+ 		return self.tos.reference_object.slots[ivar_index]
 
-    #slot_expr
-    #   object_expr
-    #   slot_name
-    def _eval_slot(self, object_expr, slot_name):
-        the_object = self.eval(object_expr)
-        the_slot = the_object.id.members[slot_name]
-        if the_slot.type == 'variable':
-            return the_object.slots[the_slot.index]
-        elif the_slot.type == 'function':
-            return ('func_rec', the_object.id.vtable[the_slot.index], the_object)
+	#slot_expr
+	#   object_expr
+	#   slot_name
+	def _eval_slot(self, object_expr, slot_name):
+		the_object = self.eval(object_expr)
+		the_slot = the_object.id.members[slot_name]
+ 		if the_slot.type == 'variable':
+ 			return the_object.slots[the_slot.index]
+  		elif the_slot.type == 'function':
+  			return ('func_rec', the_object.id.vtable[the_slot.index], the_object)
+	
+   	#conditional_expr
+   	#   test_expression
+   	#   true_expression
+   	#   false_expression
+   	# ('conditional', test_expr, true_expr, false_expr)
+   	def _eval_conditional(self, test_expr, true_expr, false_expr):
+		value = self.eval(test_expr)
+		if value != 0:
+			return self.eval(true_expr)
+		else:
+			return self.eval(false_expr)
+ 
+ 	#array_expr
+ 	#   array_values
+ 	# ('array', [array_values])
+ 	def _eval_array(self, array_values_list):
+ 		result = []
+ 		for expr in array_values_list:
+ 			sub_result = self.eval(expr)
+ 			result.append(sub_result)
+ 		return result
 
-  
-# because I'm an optimization nerd.        
+# because I'm an optimization nerd.		
 
 
-    #('prev_scope', ()) - a reference to a variable in a previous scope
-    #('local', local_index) - local variable
-    #('arg', arg_index) - local argument
-    #('sub_function', sub_function index)
-    #('ivar', slot_index)
-    #('imethod', vtable_index)
-    #('global_node', global_node_index)
-    #('int_constant', value)
-    #('float_constant', value)
-    #('string_constant', value)
-    #('array_index', array_expr, index_expr)
-    #('func_call_expr', func_expr, arg_1_expr, ... arg_n_expr)
-    #('slot_expr', object_expr, slot_name)
-    #locator_expr
-    #   string
-    #int_constant_expr
-    #   value
-    #float_constant_expr
-    #   value
-    #string_constant
-    #   value
-    #array_index_expr
-    #   array_expr
-    #   index_expr
-    #func_call_expr
-    #   func_expr
-    #   args
-    #unary_lvalue_op_expr
-    #   expression
-    #   op
-    #       "post_increment"
-    #       "post_decrement"
-    #       "pre_increment"
-    #       "pre_decrement"
-    #unary_minus_expr
-    #   expression
-    #logical_not_expr
-    #   expression
-    #bitwise_not_expr
-    #   expression
-    #float_binary_expr
-    #   left
-    #   right
-    #   op
-    #       "multiply"
-    #       "divide"
-    #       "modulus"
-    #       "add"
-    #       "subtract"
-    #int_binary_expr
-    #   left
-    #   right
-    #   op
-    #       "shift_left"
-    #       "shift_right"
-    #       "bitwise_and"
-    #       "bitwise_xor"
-    #       "bitwise_or"
-    #bool_binary_expr
-    #   left
-    #   right
-    #   op
-    #       "compare_less"
-    #       "compare_greater"
-    #       "compare_less_or_equal"
-    #       "compare_greater_or_equal"
-    #       "compare_equal"
-    #       "compare_not_equal"
-    #       "logical_and"
-    #       "logical_or"
-    #strcat_expr
-    #   left
-    #   right
-    #   op
-    #       "cat_none"
-    #       "cat_newline"
-    #       "cat_space"
-    #       "cat_tab"
-    #conditional_expr
-    #   test_expression
-    #   true_expression
-    #   false_expression
-    #assign_expr
-    #   left
-    #   right
-    #float_assign_expr
-    #   left
-    #   right
-    #   op
-    #int_assign_expr
-    #   left
-    #   right
-    #   op
-    #array_expr
-    #   array_values
-    #map_expr
-    #   map_pairs
-    #       map_pair
-    #           key
-    #           value
-    #function_expr
-    #   parameter_list
-    #   expr
-    #new_object_expr
-    #   parent_name
-    #   argument_expr_list
-    #new_object_expr_type_expr
-    #   parent_name_expr
-    #   argument_expr_list
+	#('prev_scope', ()) - a reference to a variable in a previous scope
+	#('local', local_index) - local variable
+	#('arg', arg_index) - local argument
+	#('sub_function', sub_function index)
+	#('ivar', slot_index)
+	#('imethod', vtable_index)
+	#('global_node', global_node_index)
+	#('int_constant', value)
+	#('float_constant', value)
+	#('string_constant', value)
+	#('array_index', array_expr, index_expr)
+	#('func_call_expr', func_expr, arg_1_expr, ... arg_n_expr)
+	#('slot_expr', object_expr, slot_name)
+	#locator_expr
+	#   string
+	#int_constant_expr
+	#   value
+	#float_constant_expr
+	#   value
+	#string_constant
+	#   value
+	#array_index_expr
+	#   array_expr
+	#   index_expr
+	#func_call_expr
+	#   func_expr
+	#   args
+	#unary_lvalue_op_expr
+	#   expression
+	#   op
+	#	   "post_increment"
+	#	   "post_decrement"
+	#	   "pre_increment"
+	#	   "pre_decrement"
+	#unary_minus_expr
+	#   expression
+	#logical_not_expr
+	#   expression
+	#bitwise_not_expr
+	#   expression
+	#float_binary_expr
+	#   left
+	#   right
+	#   op
+	#	   "multiply"
+	#	   "divide"
+	#	   "modulus"
+	#	   "add"
+	#	   "subtract"
+	#int_binary_expr
+	#   left
+	#   right
+	#   op
+	#	   "shift_left"
+	#	   "shift_right"
+	#	   "bitwise_and"
+	#	   "bitwise_xor"
+	#	   "bitwise_or"
+	#bool_binary_expr
+	#   left
+	#   right
+	#   op
+	#	   "compare_less"
+	#	   "compare_greater"
+	#	   "compare_less_or_equal"
+	#	   "compare_greater_or_equal"
+	#	   "compare_equal"
+	#	   "compare_not_equal"
+	#	   "logical_and"
+	#	   "logical_or"
+	#strcat_expr
+	#   left
+	#   right
+	#   op
+	#	   "cat_none"
+	#	   "cat_newline"
+	#	   "cat_space"
+	#	   "cat_tab"
+	#assign_expr
+	#   left
+	#   right
+	#float_assign_expr
+	#   left
+	#   right
+	#   op
+	#int_assign_expr
+	#   left
+	#   right
+	#   op
+	#map_expr
+	#   map_pairs
+	#	   map_pair
+	#		   key
+	#		   value
+	#function_expr
+	#   parameter_list
+	#   expr
+	#new_object_expr
+	#   parent_name
+	#   argument_expr_list
+	#new_object_expr_type_expr
+	#   parent_name_expr
+	#   argument_expr_list

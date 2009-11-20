@@ -632,11 +632,6 @@ constant_atom
 		{
 			$$ = $1;
 		}
-	| IDENTIFIER
-		{
-			$$ = node(locator_expr);
-			field($$, string, $1);
-		}
 	;
 
 switch_label
@@ -1163,7 +1158,10 @@ expression_statement
 
 array_expression
 	: '[' ']'
-		{ $$ = node(array_expr); }
+		{
+		 $$ = node(array_expr);
+		 field($$, array_values, empty_list());
+		}
 	| '[' expression_list ']'
 		{
          $$ = node(array_expr);
@@ -1206,7 +1204,7 @@ map_pair_list
 	;
 
 map_pair
-	: IDENTIFIER '=' expression
+	: expression ':' expression
 		{
          $$ = node(map_pair);
          field($$, key, $1);

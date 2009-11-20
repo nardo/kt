@@ -871,3 +871,13 @@ class image:
 			    self.compile_expression(si, expr['left'], ('integer'), True),
 			    self.compile_expression(si, expr['right'], ('integer'), False))
 	
+	def _analyze_expr_array_expr(self, si, expr, valid_types, is_lvalue):
+		if is_lvalue:
+			raise compile_error, (expr, "Array initializer cannot be an lvalue.")
+		for sub_expr in expr['array_values']:
+			self.analyze_expression(si, sub_expr, ('any'), False)
+			
+	def _compile_expr_array_expr(self, si, expr, valid_types, is_lvalue):
+		return ('array', [self.compile_expression(si, sub_expr, ('any'), False) for sub_expr in expr['array_values']])
+		
+	
