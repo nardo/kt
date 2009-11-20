@@ -879,5 +879,14 @@ class image:
 			
 	def _compile_expr_array_expr(self, si, expr, valid_types, is_lvalue):
 		return ('array', [self.compile_expression(si, sub_expr, ('any'), False) for sub_expr in expr['array_values']])
-		
 	
+	def _analyze_expr_map_expr(self, si, expr, valid_types, is_lvalue):
+		if is_lvalue:
+			raise compile_error, (expr, "Map initializer cannot be an lvalue.")
+		for pair in expr['map_pairs']:
+			self.analyze_expression(si, pair['key'], ('any'), False)
+			self.analyze_expression(si, pair['value'], ('any'), False)
+	
+	def _compile_expr_map_expr(self, si, expr, valid_types, is_lvalue):
+		return ('map', [(self.compile_expression(si, pair['key'], ('any'), False), self.compile_expression(si, pair['value'], ('any'), False)) for pair in expr['map_pairs']])
+		

@@ -304,6 +304,19 @@ class vm:
  			result.append(sub_result)
  		return result
 
+	#map_expr
+	#   map_pairs
+	#	   map_pair
+	#		   key
+	#		   value
+	def _eval_map(self, map_pairs_list):
+		result = {}
+		for pair in map_pairs_list:
+			key = self.eval(pair[0])
+			value = self.eval(pair[1])
+			result[key] = value
+		return result
+
 # because I'm an optimization nerd.		
 
 
@@ -396,11 +409,6 @@ class vm:
 	#   left
 	#   right
 	#   op
-	#map_expr
-	#   map_pairs
-	#	   map_pair
-	#		   key
-	#		   value
 	#function_expr
 	#   parameter_list
 	#   expr
