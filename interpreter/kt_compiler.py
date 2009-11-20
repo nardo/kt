@@ -421,6 +421,7 @@ class image:
 			
 	class semantic_info:
 		def __init__(self):
+			self.function_expr_count = 0
 			self.loop_count = 0
 			self.switch_count = 0
 			self.arg_count = 0
@@ -507,6 +508,18 @@ class image:
 		si.child_functions.append(function_index)
 	def _compile_stmt_function_declaration(self, si, stmt, continue_ip, break_ip):
 		pass
+	
+	def _analyze_expr_function_expr(self, si, expr, valid_types, is_lvalue):
+		si.function_expr_count += 1
+		func_name = "__func_expr_" + str(si.function_expr_count)
+		stmt = { 'type': 'function_declaration', 'name': func_name, 'parameter_list': expr['parameter_list'], 'statements': ( {'type': 'return_stmt', 'return_expression_list': (expr['expr'],) }, ) }
+		function_index = self.add_sub_function_record(stmt)
+		si.symbols[func_name] = ('sub_function', function_index)
+		si.child_functions.append(function_index)
+		expr['function_index'] = function_index
+
+	def _compile_expr_function_expr(self, si, expr, valid_types, is_lvalue):
+		return ('sub_function', expr['function_index'])
 
 	def _analyze_stmt_continue_stmt(self, si, stmt):
 		if si.loop_count == 0:
@@ -889,4 +902,3 @@ class image:
 	
 	def _compile_expr_map_expr(self, si, expr, valid_types, is_lvalue):
 		return ('map', [(self.compile_expression(si, pair['key'], ('any'), False), self.compile_expression(si, pair['value'], ('any'), False)) for pair in expr['map_pairs']])
-		

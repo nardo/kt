@@ -14,3 +14,9 @@ function main()
 
 	array = { "foo" : "bar", "slash" : "dot", 100 : 5000 }
 	print("This should be dot: " @ array["slash"])
+
+	function test_function(func)
+		print("Sub function result = " @ func())
+
+	test_function(function() { "sweetness!" } )
+
