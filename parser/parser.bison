@@ -283,6 +283,15 @@ object_declaration
 			field($$, image_list, $5);
 			field($$, body, $7);
 		}
+	| IDENTIFIER parent_specifier image_list_specifier end_token compound_body optional_end_token
+		{ 
+			$$ = node(object);
+			field($$, is_public, false);
+			field($$, name, $1);
+			field($$, parent_decl, $2);
+			field($$, image_list, $3);
+			field($$, body, $5);
+		}
 	;
 
 /*-----------------------------------------------------------------------------------------*/  
@@ -731,6 +740,8 @@ primary_expression
 		{ $$ = $1; }
 	| '(' expression ')'
 		{ $$ = $2; }
+	| array_expression
+	| map_expression
 	;
 
 fragmented_string
@@ -1084,18 +1095,6 @@ conditional_expression
 
 assignment_expression
 	: conditional_expression
-	| unary_expression '=' array_expression
-		{
-         $$ = node(assign_expr);
-         field($$, left, $1);
-         field($$, right, $3);
-      }
-	| unary_expression '=' map_expression
-		{
-         $$ = node(assign_expr);
-         field($$, left, $1);
-         field($$, right, $3);
-      }
 	| unary_expression '=' assignment_expression
 		{
          $$ = node(assign_expr);
@@ -1213,7 +1212,7 @@ map_pair
 	;
 
 function_expression
-	: "function" '(' optional_parameter_list ')' '{' expression '}'
+	: "function" '(' optional_parameter_list ')' '(' expression ')'
 		{
          $$ = node(function_expr);
          field($$, parameter_list, $3);
