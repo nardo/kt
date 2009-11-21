@@ -1237,9 +1237,9 @@ new_expression
 
 optional_argument_specifier
 	:
-		{ $$ = nil; }
+		{ $$ = empty_list(); }
 	| '(' ')'
-		{ $$ = nil; }
+		{ $$ = empty_list(); }
 	| '(' argument_expression_list ')'
 		{ $$ = $2; }
 	;

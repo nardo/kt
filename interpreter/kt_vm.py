@@ -29,7 +29,10 @@ class vm:
 			return self
 	class class_instance:
 		def __init__(self, node):
-			pass
+			self.node = node
+			self.compound_record = node.compound_record
+		def eval(self, vm):
+			return self
 	class function_instance:
 		def __init__(self, node):
 			self.func_record = node.func_record
@@ -316,8 +319,23 @@ class vm:
 			value = self.eval(pair[1])
 			result[key] = value
 		return result
-
-# because I'm an optimization nerd.		
+	#new_object_expr
+	#   parent_name
+	#   argument_expr_list
+	
+	def _eval_new(self, class_node, args):
+		cnode = self.eval(class_node)
+		result = vm.object_instance(cnode.node)
+		evaluated_args = [self.eval(arg) for arg in args]
+		if cnode.node.constructor_index is not None:
+			callable = ('func_rec', self.image.functions[cnode.node.constructor_index], result)
+			self.call_function(callable, evaluated_args)
+		return result
+		
+	
+	#new_object_expr_type_expr
+	#   parent_name_expr
+	#   argument_expr_list
 
 
 	#('prev_scope', ()) - a reference to a variable in a previous scope
@@ -412,9 +430,3 @@ class vm:
 	#function_expr
 	#   parameter_list
 	#   expr
-	#new_object_expr
-	#   parent_name
-	#   argument_expr_list
-	#new_object_expr_type_expr
-	#   parent_name_expr
-	#   argument_expr_list

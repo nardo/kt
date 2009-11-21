@@ -902,3 +902,23 @@ class image:
 	
 	def _compile_expr_map_expr(self, si, expr, valid_types, is_lvalue):
 		return ('map', [(self.compile_expression(si, pair['key'], ('any'), False), self.compile_expression(si, pair['value'], ('any'), False)) for pair in expr['map_pairs']])
+		
+	def _analyze_expr_new_object_expr(self, si, expr, valid_types, is_lvalue):
+		if is_lvalue:
+			raise compile_error, (expr, "new expression cannot be an lvalue.")
+					# search the global container
+		node = self.find_node(si.compound_node, expr['parent_name'])
+		if not node:
+			raise compile_error, (expr, "locator " + locator_name + " not found.")
+		expr['location'] = ('global_node', node)
+		if not (node.type == 'class' or node.type == 'struct'):
+			raise compile_error, (expr, "new only allowed for classes and structs.")
+		for arg in expr['argument_expr_list']:
+			self.analyze_expression(si, arg, ('any'), False)
+	
+	def _compile_expr_new_object_expr(self, si, expr, valid_types, is_lvalue):
+		return ('new', expr['location'], [self.compile_expression(si, arg, ('any'), False) for arg in expr['argument_expr_list']])
+		
+	
+		
+		
