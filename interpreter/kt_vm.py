@@ -5,7 +5,7 @@
 from kt_compiler import build_jump_table
 import types
 
-should_spew = True
+should_spew = False
 
 Exec_Normal = 0
 Exec_Return = 1
