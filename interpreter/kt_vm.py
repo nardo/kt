@@ -21,6 +21,11 @@ class fatal_error:
 		self.error_string = error_string
 		
 class vm:
+	class function_record_instance:
+		def __init__(self, record):
+			self.function_record = record
+		def call(self, vm, reference_object, parameters):
+			vm.invoke_function_record(self.function_record, reference_object, parameters)
 	class object_instance:
 		def __init__(self, node):
 			self.id = node.compound_record
@@ -32,18 +37,28 @@ class vm:
 			self.node = node
 			self.compound_record = node.compound_record
 		def eval(self, vm):
-			return self
+			return (self, None)
+		def call(self, vm, reference_object, params):
+			result = vm.object_instance(self.node)
+			if self.node.constructor_index is not None:
+				vm.invoke_function_record(vm.image.functions[self.node.constructor_index], result, params)
+			vm.return_value = result
+			
 	class function_instance:
 		def __init__(self, node):
 			self.func_record = node.func_record
 			self.container_index = node.container.global_index
 		def eval(self, vm):
-			return ('func_rec', self.func_record, vm.globals[self.container_index])
+			return (self, vm.globals[self.container_index])
+		def call(self, vm, reference_object, params):
+			return vm.invoke_function_record(self.func_record, reference_object, params)
 	class python_function_instance:
 		def __init__(self, node):
 			self.python_function = node.python_function
 		def eval(self, vm):
-			return ('py_func', self.python_function)
+			return (self, None)
+		def call(self, vm, reference_object, params):
+			self.python_function(*params)
 	class python_class_instance:
 		def __init__(self, node):
 			self.python_class = node.python_class
@@ -82,26 +97,24 @@ class vm:
 		self.return_value = None
 		for o in (o for o in compiled_image.globals_list if o.type == 'object'):
 			if o.constructor_index is not None:
-				callable = ('func_rec', compiled_image.functions[o.constructor_index], self.globals[o.global_index])
+				callable = (vm.function_record_instance(compiled_image.functions[o.constructor_index]), self.globals[o.global_index])
 				self.call_function(callable, ())
 				
 	def exec_function(self, func_name, args):
 		func_node = self.image.find_node(None, func_name, lambda x: x.type =='function' )
 		self.call_function(self.globals[func_node.global_index].eval(self), ())
 	
-	def call_function(self, callable, arguments):
-		if callable[0] == 'func_rec':
-			function_record = callable[1]
-			reference_object = callable[2]
-			new_frame = vm.frame(function_record, arguments, self.tos, reference_object)
-			self.tos = new_frame
+	def invoke_function_record(self, function_record, reference_object, arguments):
+		new_frame = vm.frame(function_record, arguments, self.tos, reference_object)
+		self.tos = new_frame
+		result = self.exec_current_instruction()
+		while result == Exec_Normal:
 			result = self.exec_current_instruction()
-			while result == Exec_Normal:
-				result = self.exec_current_instruction()
-			self.tos = self.tos.prev_frame
-			return result
-		elif callable[0] == 'py_func':
-			callable[1](*arguments)
+		self.tos = self.tos.prev_frame
+		return result
+	
+	def call_function(self, callable, arguments):
+		callable[0].call(self, callable[1], arguments)
 
 	def exec_current_instruction(self):
 		instruction = self.tos.function_record.statements[self.tos.ip]
@@ -236,7 +249,7 @@ class vm:
 		return self.globals[node.global_index].eval(self)
 	def _eval_sub_function(self, sub_function_index):
 		# callables are (function_record, reference_object) pairs
-		return ('func_rec', self.image.functions[sub_function_index], self.tos)
+		return (vm.function_record_instance(self.image.functions[sub_function_index]), self.tos)
 	def _eval_string_constant(self, value):
 		return value
 	def _eval_int_constant(self, value):
@@ -266,11 +279,11 @@ class vm:
 		reference_object = self.tos.reference_object
 		method = reference_object.id.vtable[imethod_index]
 		spew("imethod: " + str(reference_object))
-		return ('func_rec', method, reference_object) 
+		return (vm.function_record_instance(method), reference_object) 
 	def _eval_selfmethod_global(self, global_index):
 		reference_object = self.tos.reference_object
 		method = self.image.functions[global_index]
-		return ('func_rec', method, reference_object)
+		return (vm.function_record_instance(method), reference_object)
 	def _eval_ivar(self, ivar_index):
  		return self.tos.reference_object.slots[ivar_index]
 
@@ -283,7 +296,7 @@ class vm:
  		if the_slot.type == 'variable':
  			return the_object.slots[the_slot.index]
   		elif the_slot.type == 'function':
-  			return ('func_rec', the_object.id.vtable[the_slot.index], the_object)
+  			return (vm.function_record_instance(the_object.id.vtable[the_slot.index]), the_object)
 	
    	#conditional_expr
    	#   test_expression
@@ -319,24 +332,6 @@ class vm:
 			value = self.eval(pair[1])
 			result[key] = value
 		return result
-	#new_object_expr
-	#   parent_name
-	#   argument_expr_list
-	
-	def _eval_new(self, class_node, args):
-		cnode = self.eval(class_node)
-		result = vm.object_instance(cnode.node)
-		evaluated_args = [self.eval(arg) for arg in args]
-		if cnode.node.constructor_index is not None:
-			callable = ('func_rec', self.image.functions[cnode.node.constructor_index], result)
-			self.call_function(callable, evaluated_args)
-		return result
-		
-	
-	#new_object_expr_type_expr
-	#   parent_name_expr
-	#   argument_expr_list
-
 
 	#('prev_scope', ()) - a reference to a variable in a previous scope
 	#('local', local_index) - local variable

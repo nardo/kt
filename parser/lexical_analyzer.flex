@@ -459,7 +459,6 @@ COMMENT		"//"[^\n\r]*
 "switch"		return rwSWITCH;
 "case"			return rwCASE;
 "default"		return rwDEFAULT;
-"new"			return rwNEW;
 "var"			return rwVAR;
 "file"			return rwFILE;
 

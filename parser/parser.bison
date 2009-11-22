@@ -63,7 +63,6 @@ void kt_error (struct YYLTYPE *loc, kt_lexer *lexer, parse_result *result, const
 %token rwSWITCH "switch"
 %token rwCASE "case"
 %token rwDEFAULT "default"
-%token rwNEW "new"
 %token rwVAR "var"
 %token rwINTEGER "integer"
 %token rwFLOAT "float"
@@ -1076,15 +1075,14 @@ strcat_expression
       }
 	;
 	
-new_or_func_expression
+strcat_or_func_expression
 	: strcat_expression
-	| new_expression
 	| function_expression
 	;
 
 conditional_expression
-	: new_or_func_expression
-	| new_or_func_expression '?' expression ':' conditional_expression
+	: strcat_or_func_expression
+	| strcat_or_func_expression '?' expression ':' conditional_expression
 		{
          $$ = node(conditional_expr);
          field($$, test_expression, $1);
@@ -1219,31 +1217,6 @@ function_expression
          field($$, expr, $6);
       }
 	;
-
-new_expression
-	: "new" locator optional_argument_specifier 
-		{
-         $$ = node(new_object_expr);
-         field($$, parent_name, $2);
-         field($$, argument_expr_list, $3);
-      }
-	| "new" '(' expression ')' optional_argument_specifier
-		{
-         $$ = node(new_object_expr_type_expr);
-         field($$, parent_name_expr, $3);
-         field($$, argument_expr_list, $5);
-      }
-   ;
-
-optional_argument_specifier
-	:
-		{ $$ = empty_list(); }
-	| '(' ')'
-		{ $$ = empty_list(); }
-	| '(' argument_expression_list ')'
-		{ $$ = $2; }
-	;
-
 
 %%
 
