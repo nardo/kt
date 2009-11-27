@@ -214,6 +214,9 @@ class image:
 	def build_tree_recurse_decl(self, image_node):
 		if 'body' in image_node.decl and image_node.decl['body'] != None:
 			for sub_decl in image_node.decl['body']:
+				if 'primary_name' in sub_decl:
+					sub_decl['name'] = sub_decl['primary_name'] + "".join(str(pair['string'] if pair['string'] is not None else "") + ":" for pair in sub_decl['selector_decl_list'] )
+					sub_decl['parameter_list'] = [pair['name'] for pair in sub_decl['selector_decl_list']]
 				if 'name' in sub_decl and self.decl_in_image(sub_decl):
 					if sub_decl['name'] in image_node.contents:
 						raise compile_error, (image_node, "Redefinition of " + sub_decl['name'] + " in " + image_node.name + " not allowed.")
@@ -763,6 +766,17 @@ class image:
 		for arg in expr['args']:
 			arg_array.append(self.compile_expression(si, arg, ('any'), False) )
 		return ('func_call', self.compile_expression(si, expr['func_expr'], ('callable'), False), arg_array)
+	
+	def _analyze_expr_method_call(self, si, expr, valid_types, is_lvalue):
+		args = [pair['expr'] for pair in expr['selector_list']]
+		sel_str = expr['primary_name'] + "".join(str(pair['string'] if pair['string'] is not None else "") + ":" for pair in expr['selector_list'] )
+		print "Got selector: " + sel_str
+		expr['func_expr'] = { 'type': 'slot_expr', 'object_expr' : expr['object_expr'], 'slot_name': sel_str}
+		expr['args'] = args
+		self._analyze_expr_func_call_expr(si, expr, valid_types, is_lvalue)
+		
+	def _compile_expr_method_call(self, si, expr, valid_types, is_lvalue):
+		return self._compile_expr_func_call_expr(si, expr, valid_types, is_lvalue)
 		
 	def _analyze_expr_slot_expr(self, si, expr, valid_types, is_lvalue):
 		object_expr = expr['object_expr']

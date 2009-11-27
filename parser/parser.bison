@@ -53,6 +53,7 @@ void kt_error (struct YYLTYPE *loc, kt_lexer *lexer, parse_result *result, const
 %token rwFINALLY "finally"
 %token rwWHEN "when"
 %token rwFUNCTION "function"
+%token rwMETHOD "method"
 %token rwRETURN "return"
 %token rwWHILE "while"
 %token rwFOR "for"
@@ -157,6 +158,7 @@ declaration
 	| variable_declaration
 	| slot_assignment_declaration
 	| function_declaration
+	| method_declaration
 	;
 
 compound_declaration
@@ -487,6 +489,70 @@ function_declaration
 		}
 	;
 
+method_declaration
+	: is_public is_shared "method" IDENTIFIER selector_decl_args optional_return_type image_list_specifier end_token function_body optional_end_token
+		{
+			$$ = node(function);
+			field($$, primary_name, $4);
+			field($$, selector_decl_list, $5);
+			field($$, is_public, $1);
+			field($$, is_shared, $2);
+			field($$, return_type_list, $6);
+			field($$, image_list, $7);
+			field($$, statements, $9);
+		}
+	| is_public is_shared "method" IDENTIFIER optional_return_type image_list_specifier end_token function_body optional_end_token
+		{
+			$$ = node(function);
+			field($$, primary_name, $4);
+			field($$, selector_decl_list, empty_list());
+			field($$, is_public, $1);
+			field($$, is_shared, $2);
+			field($$, return_type_list, $5);
+			field($$, image_list, $6);
+			field($$, statements, $8);
+		}
+	;
+
+selector_decl_args
+	: ':' optional_selector_type_spec IDENTIFIER
+		{
+			YYSTYPE pair;
+			pair = node(selector_pair);
+			field(pair, string, nil);
+			field(pair, type_spec, $2);
+			field(pair, name, $3);
+			$$ = list(pair);
+		}	
+	| selector_decl_args ':' optional_selector_type_spec IDENTIFIER
+		{
+			YYSTYPE pair;
+			pair = node(selector_pair);
+			field(pair, string, nil);
+			field(pair, type_spec, $3);
+			field(pair, name, $4);
+			append($1, pair);
+			$$ = $1;
+		}
+	| selector_decl_args IDENTIFIER ':' optional_selector_type_spec IDENTIFIER
+		{
+			YYSTYPE pair;
+			pair = node(selector_pair);
+			field(pair, string, $2);
+			field(pair, type_spec, $4);
+			field(pair, name, $5);
+			append($1, pair);
+			$$ = $1;
+		}
+	;
+
+optional_selector_type_spec
+	:
+		{ $$ = nil; }
+	| '(' type_specifier ')'
+		{ $$ = $1; }
+	;
+
 optional_end_token
    :
    | END_TOK
@@ -730,6 +796,7 @@ primary_expression
          $$ = node(int_constant_expr);
          field($$, value, $1);
       }
+	| method_call
 	| FLOAT_CONSTANT
 		{
          $$ = node(float_constant_expr);
@@ -741,6 +808,52 @@ primary_expression
 		{ $$ = $2; }
 	| array_expression
 	| map_expression
+	;
+
+method_call
+	: '[' expression IDENTIFIER selector_args ']'
+		{
+			$$ = node(method_call);
+			field($$, object_expr, $2);
+			field($$, primary_name, $3);
+			field($$, selector_list, $4);
+		}
+	| '[' expression IDENTIFIER ']'
+		{
+			$$ = node(method_call);
+			field($$, object_expr, $2);
+			field($$, primary_name, $3);
+			field($$, selector_list, empty_list());
+		}
+	;
+
+selector_args
+	: ':' expression
+		{
+			YYSTYPE pair;
+			pair = node(selector_pair);
+			field(pair, string, nil);
+			field(pair, expr, $2);
+			$$ = list(pair);
+		}	
+	| selector_args ':' expression
+		{
+			YYSTYPE pair;
+			pair = node(selector_pair);
+			field(pair, string, nil);
+			field(pair, expr, $3);
+			append($1, pair);
+			$$ = $1;
+		}
+	| selector_args IDENTIFIER ':' expression
+		{
+			YYSTYPE pair;
+			pair = node(selector_pair);
+			field(pair, string, $2);
+			field(pair, expr, $4);
+			append($1, pair);
+			$$ = $1;
+		}
 	;
 
 fragmented_string

@@ -1,6 +1,5 @@
 function test_function()
 	var part1 = "hello"
-	//var part1 = 10
 	var part2 = ", world!"
 
 	function get_letter(index)

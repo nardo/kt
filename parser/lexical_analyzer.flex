@@ -449,6 +449,7 @@ COMMENT		"//"[^\n\r]*
 "when"			return rwWHEN;
 "state"			return rwSTATE;
 "function"		return rwFUNCTION;
+"method"		return rwMETHOD;
 "return"		return rwRETURN;
 "while"			return rwWHILE;
 "for"			return rwFOR;
