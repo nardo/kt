@@ -6,6 +6,22 @@ import os
 import stat
 import kt
 
+class ast_node:
+	def dump(self, level):
+		pass
+
+def dump_ast(node, level):
+	if node is None:
+		return "<null>"
+	elif node.__class__ == list:
+		return "( " + ", ".join( (dump_ast(x, level + 2) for x in node) ) + " )"
+	elif node.__class__ == ast_node:
+		return "\n" + " " * (level * 2) + "node" + "".join ( "\n" + " " * (level * 2 + 2) + str(field_name) + " = " + dump_ast(node.__dict__[field_name], level + 2) for field_name in node.__dict__.keys() )
+	elif node.__class__ == str:
+		return "\"" + node + "\""
+	else:
+		return str(node)
+
 class file_tree_node:
     def __init__(self, name, type, parse_result):
         self.name = name
@@ -32,8 +48,9 @@ def build_file_tree(root_path):
                 text = kt_file.read()
                 print text
                 kt_file.close()
-                parse_result = kt.parse(text)
+                parse_result = kt.parse(text, ast_node)
                 print parse_result
+                print dump_ast(parse_result, 0)
                 node.contents[file] = file_tree_node(file, 'kt', parse_result)
             else:
                 node.contents[file] = file_tree_node(file, 'resource', None)

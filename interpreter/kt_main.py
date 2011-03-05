@@ -7,6 +7,7 @@ from kt_vm import *
 from kt_builtin_functions import *
 from kt_builtin_classes import *
 from kt_file_tree import *
+from kt_codegen import *
 
 import sys
 import traceback
@@ -38,6 +39,9 @@ def test():
 			
 			the_vm = vm(the_image)
 			the_vm.exec_function("main", ())
+			
+			the_code_generator = code_generator(the_image)
+			the_code_generator.go()
 
 	except compile_error, err:
 		traceback.print_exc()
@@ -47,3 +51,4 @@ def test():
 		print "Fatal: " + err.error_string
 		
 test()
+print ast_node

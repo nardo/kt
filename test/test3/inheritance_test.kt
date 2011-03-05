@@ -1,18 +1,18 @@
 class test_class(_x)
 	var x = _x
-	function do_print()
-		print("X = $x")
+	function do_print(foo)
+		print("X = $x, foo = $foo")
 
 class test_subclass(_x, _y) : test_class(_x)
 	var y = _y
-	function do_print()
-		parent.do_print()
+	function do_print(foo)
+		parent.do_print(foo)
 		print("X = $x, Y = $y")
 
 object the_object : test_subclass(10, 20)
 	var z = 30
-	function do_print()
-		parent.do_print()
+	function do_print(foo)
+		parent.do_print(foo)
 		print("X = $x, Y = $y, Z = $z")
 
 object container
@@ -33,11 +33,11 @@ object container2
 
 
 function main()
-	the_object.do_print()
+	the_object.do_print(100)
 	'container/sub_object2'.do_print()
 	sub_object2.do_print()
 	'container2/sub_object2'.do_print()
 	//var object3 = new test_subclass(100, 200)
 	//object3.do_print()
 	var object4 = test_subclass("foo", "bar")
-	object4.do_print()
+	object4.do_print(200)

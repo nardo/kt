@@ -1,12 +1,12 @@
 LEX=flex
 YACC=bison
 CPPFLAGS=-I/usr/include/python2.5
-LDFLAGS=-lpython2.5 -lstdc++
+LDFLAGS=-lpython2.5 -lstdc++ -framework Foundation
 parser: main.o parser.o lexical_analyzer.o
 	$(CC) -o $@ $(LDFLAGS) $^
 
-main.o: main.cpp parser_interface.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ -c main.cpp
+main.o: main.M parser_interface.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ -c main.M
 
 parser.o: parser.cpp parser_interface.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ -c parser.cpp
