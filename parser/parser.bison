@@ -39,11 +39,11 @@ void kt_error (struct YYLTYPE *loc, kt_lexer *lexer, parse_result *result, const
 %token rwBETWEEN "between"
 %token rwOBJECT "object"
 %token rwCLASS "class"
-%token rwSTRUCT "struct"
+%token rwRECORD "record"
 %token rwDIRECTORY "directory"
 %token rwCONNECTION "connection"
 %token rwALIAS "alias"
-%token rwIMAGE "image"
+%token rwFACET "facet"
 %token rwIN "in"
 %token rwFROM "from"
 %token rwTO "to"
@@ -153,7 +153,7 @@ declaration_list
 declaration
 	: compound_declaration
 	| state_declaration
-	| image_declaration
+	| facet_declaration
 	| type_declaration
 	| variable_declaration
 	| slot_assignment_declaration
@@ -164,20 +164,20 @@ declaration
 compound_declaration
 	: class_declaration
 	| object_declaration
-	| struct_declaration
+	| record_declaration
 	| connection_declaration
 	;
    
 /*-----------------------------------------------------------------------------------------*/  
 class_declaration
-	: is_public "class" IDENTIFIER declaration_parameters parent_specifier image_list_specifier transmission_list_specifier end_token compound_body optional_end_token
+	: is_public "class" IDENTIFIER declaration_parameters parent_specifier facet_list_specifier transmission_list_specifier end_token compound_body optional_end_token
 		{
 			$$ = node(class);
 			field($$, name, $3);
 			field($$, decl_flags, $1);
 			field($$, parameter_list, $4);
 			field($$, parent_decl, $5);
-			field($$, image_list, $6);
+			field($$, facet_list, $6);
 			field($$, transmission_list, $7);
 			field($$, body, $9);
 		}
@@ -227,17 +227,17 @@ locator
 		{ $$ = $1; }
 	;
 
-image_list_specifier
+facet_list_specifier
 	:
 		{ $$ = nil; }
-	| "in" image_name_list
+	| "in" facet_name_list
 		{ $$ = $2; }
 	;
 
-image_name_list
+facet_name_list
 	: IDENTIFIER
 	   { $$ = list($1); }
-	| image_name_list ',' IDENTIFIER
+	| facet_name_list ',' IDENTIFIER
 		{ $$ = $1; append($1, $3); }
 	;
 
@@ -258,8 +258,8 @@ transmission_specifier
 	: "from" IDENTIFIER "to" IDENTIFIER "via" locator
 		{
          $$ = node(transmission_specifier);
-         field($$, from_image, $2);
-         field($$, to_image, $4);
+         field($$, from_facet, $2);
+         field($$, to_facet, $4);
          field($$, via, $6);
       }
 	;
@@ -275,37 +275,37 @@ compound_body
 
 /*-----------------------------------------------------------------------------------------*/  
 object_declaration
-	: is_public "object" IDENTIFIER parent_specifier image_list_specifier end_token compound_body optional_end_token
+	: is_public "object" IDENTIFIER parent_specifier facet_list_specifier end_token compound_body optional_end_token
 		{ 
 			$$ = node(object);
 			field($$, is_public, $1);
 			field($$, name, $3);
 			field($$, parent_decl, $4);
-			field($$, image_list, $5);
+			field($$, facet_list, $5);
 			field($$, body, $7);
 		}
-	| IDENTIFIER parent_specifier image_list_specifier end_token compound_body optional_end_token
+	| IDENTIFIER parent_specifier facet_list_specifier end_token compound_body optional_end_token
 		{ 
 			$$ = node(object);
 			field($$, is_public, false);
 			field($$, name, $1);
 			field($$, parent_decl, $2);
-			field($$, image_list, $3);
+			field($$, facet_list, $3);
 			field($$, body, $5);
 		}
 	;
 
 /*-----------------------------------------------------------------------------------------*/  
-struct_declaration
-   : is_public "struct" IDENTIFIER declaration_parameters parent_specifier image_list_specifier end_token
+record_declaration
+   : is_public "record" IDENTIFIER declaration_parameters parent_specifier facet_list_specifier end_token
      compound_body optional_end_token
       {
-         $$ = node(struct);
+         $$ = node(record);
          field($$, is_public, $1);
          field($$, name, $3);
          field($$, parameter_list, $4);
          field($$, parent_decl, $5);
-         field($$, image_list, $6);
+         field($$, facet_list, $6);
          field($$, body, $8);
       }
    ;
@@ -328,8 +328,8 @@ between_specifier
 	: "between" IDENTIFIER ',' IDENTIFIER
       {
          $$ = node(transmission_specifier);
-         field($$, from_image, $2);
-         field($$, to_image, $4);
+         field($$, from_facet, $2);
+         field($$, to_facet, $4);
          $$ = list($$);
       }
    ;
@@ -347,10 +347,10 @@ state_declaration
 	;
    
 /*-----------------------------------------------------------------------------------------*/  
-image_declaration
-	: "image" IDENTIFIER end_token compound_body optional_end_token
+facet_declaration
+	: "facet" IDENTIFIER end_token compound_body optional_end_token
 		{
-			$$ = node(image);
+			$$ = node(facet);
 			field($$, name, $2);
 			field($$, body, $4);
 		}
@@ -368,31 +368,23 @@ type_declaration
    ;
 
 type_specifier
-   : base_type 
-      { $$ = $1; }
-   | base_type array_specifier
-      {
-         $$ = $1;
-         field($1, is_array, boolean(true));
-         field($1, size_expr, $2);
-      }
-   ;
-
-base_type
    : locator
       {
-         $$ = node(type_specifier);
-         field($$, is_reference, boolean(false));
+         $$ = node(locator_type_specifier);
          field($$, locator, $1);
-         field($$, is_array, boolean(false));
       }
-   | locator "&"
+   | type_specifier "&"
       {
-         $$ = node(type_specifier);
-         field($$, is_reference, boolean(true));
-         field($$, locator, $1);
-         field($$, is_array, boolean(false));
+         $$ = node(reference_type_specifier);
+         field($$, base_type, $1);
       }
+   | type_specifier array_specifier
+      {
+         $$ = node(array_type_specifier);
+         field($$, base_type, $1);
+         field($$, size_expr, $2);
+      }
+   | map_specifier
    ;
 
 array_specifier
@@ -400,6 +392,11 @@ array_specifier
       { $$ = nil; }
    | '[' expression ']'
       { $$ = $2; }
+   ;
+   
+map_specifier
+   : '{' '}'
+   | '{' type_specifier ',' type_specifier '}'
    ;
 
 optional_type_specifier
@@ -476,7 +473,7 @@ slot_assignment_declaration
    
 /*-----------------------------------------------------------------------------------------*/  
 function_declaration
-	: is_public is_shared "function" IDENTIFIER '(' optional_parameter_list ')' optional_return_type image_list_specifier end_token function_body optional_end_token
+	: is_public is_shared "function" IDENTIFIER '(' optional_parameter_list ')' optional_return_type facet_list_specifier end_token function_body optional_end_token
 		{
 			$$ = node(function);
 			field($$, name, $4);
@@ -484,13 +481,13 @@ function_declaration
 			field($$, is_shared, $2);
 			field($$, parameter_list, $6);
 			field($$, return_type_list, $8);
-			field($$, image_list, $9);
+			field($$, facet_list, $9);
 			field($$, statements, $11);
 		}
 	;
 
 method_declaration
-	: is_public is_shared "method" IDENTIFIER selector_decl_args optional_return_type image_list_specifier end_token function_body optional_end_token
+	: is_public is_shared "method" IDENTIFIER selector_decl_args optional_return_type facet_list_specifier end_token function_body optional_end_token
 		{
 			$$ = node(function);
 			field($$, primary_name, $4);
@@ -498,10 +495,10 @@ method_declaration
 			field($$, is_public, $1);
 			field($$, is_shared, $2);
 			field($$, return_type_list, $6);
-			field($$, image_list, $7);
+			field($$, facet_list, $7);
 			field($$, statements, $9);
 		}
-	| is_public is_shared "method" IDENTIFIER optional_return_type image_list_specifier end_token function_body optional_end_token
+	| is_public is_shared "method" IDENTIFIER optional_return_type facet_list_specifier end_token function_body optional_end_token
 		{
 			$$ = node(function);
 			field($$, primary_name, $4);
@@ -509,7 +506,7 @@ method_declaration
 			field($$, is_public, $1);
 			field($$, is_shared, $2);
 			field($$, return_type_list, $5);
-			field($$, image_list, $6);
+			field($$, facet_list, $6);
 			field($$, statements, $8);
 		}
 	;
@@ -565,7 +562,7 @@ end_token
 function_declaration_statement
    : "function" IDENTIFIER '(' optional_parameter_list ')' optional_return_type end_token function_body
       {
-         $$ = node(function_declaration);
+         $$ = node(function_declaration_stmt);
          field($$, name, $2);
          field($$, parameter_list, $4);
          field($$, return_type, $6);

@@ -433,12 +433,13 @@ COMMENT		"//"[^\n\r]*
 "="		return yytext[0];
 
 "class"			return rwCLASS;
+"record"		return rwRECORD;
 "object"		return rwOBJECT;
-"connection"	return rwCONNECTION;
+"connection"		return rwCONNECTION;
 "directory"		return rwDIRECTORY;
 "between"		return rwBETWEEN;
 "alias"			return rwALIAS;
-"image"			return rwIMAGE;
+"facet"			return rwFACET;
 "in"			return rwIN;
 "from"			return rwFROM;
 "to"			return rwTO;

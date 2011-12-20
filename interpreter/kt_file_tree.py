@@ -58,31 +58,31 @@ def build_file_tree(root_path):
     recurse_directory(root, root_path)
     return root
 
-def get_image_set(file_tree):
-    def recurse_decl(decl, image_set):
+def get_facet_set(file_tree):
+    def recurse_decl(decl, facet_set):
         if type(decl) is dict:
-            if decl['type'] == 'image':
-                image_set.add(decl['name'])
-            if 'image_list' in decl and decl['image_list'] is not None:
-                image_set.update(decl['image_list'])
+            if decl['type'] == 'facet':
+                facet_set.add(decl['name'])
+            if 'facet_list' in decl and decl['facet_list'] is not None:
+                facet_set.update(decl['facet_list'])
             if 'transmission_list' in decl and decl['transmission_list'] is not None:
                 for trans_spec in decl['transmission_list']:
-                    image_set.add(trans_spec['from_image'])
-                    image_set.add(trans_spec['to_image'])
+                    facet_set.add(trans_spec['from_facet'])
+                    facet_set.add(trans_spec['to_facet'])
             for v in decl.values():
-                recurse_decl(v, image_set)
+                recurse_decl(v, facet_set)
         elif type(decl) is list:
             for i in decl:
-                recurse_decl(i, image_set)
-    def recurse_file_tree(node, image_set):
+                recurse_decl(i, facet_set)
+    def recurse_file_tree(node, facet_set):
         for child in node.contents.values():
             if child.type == 'directory':
-                recurse_file_tree(child, image_set)
+                recurse_file_tree(child, facet_set)
             elif child.type == 'kt':
-                recurse_decl(child.parse_result, image_set)
-    image_set = set()
-    recurse_file_tree(file_tree, image_set)
-    if len(image_set) == 0:
-        image_set.add('Default')
-    return image_set
+                recurse_decl(child.parse_result, facet_set)
+    facet_set = set()
+    recurse_file_tree(file_tree, facet_set)
+    if len(facet_set) == 0:
+        facet_set.add('Default')
+    return facet_set
 

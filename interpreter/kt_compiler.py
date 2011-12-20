@@ -6,6 +6,8 @@ import os
 import stat
 import kt
 from kt_file_tree import *
+from kt_builtin_functions import *
+from kt_builtin_classes import *
 
 # general error exception thrown by the compiler if given incorrect input
 class compile_error:
@@ -13,36 +15,76 @@ class compile_error:
 		self.node_where = node_where
 		self.error_string = error_string
 
+# output a warning message during the compile process
 def compiler_warning(node_where, warning_string):
 	print "Warning!: " + warning_string
 
+# nodes that can be compounds of other nodes
 compound_node_types = ('object', 'class', 'struct')
 
-
-def iterate_tree(t):
-		for sub_object in t.contents.values():
-			for x in iterate_tree(sub_object):
-				yield x
-		yield t
-
+# builds a fast lookup table for all functions on an object whose names end
+# in a particular string.  The table is indexed by the prefix string of the
+# function name
+def build_jump_table_new(the_object, postfix):
+	the_map = {}
+	for pair in the_object.__dict__.iteritems():
+		if pair[0].endswith(postfix):
+			split_string = pair[0].partition(postfix)
+			the_map[split_string[0]] = pair[1]
+	return the_map
 def build_jump_table(the_object, prefix):
-    the_map = {}
-    for pair in the_object.__dict__.iteritems():
-        if pair[0].startswith(prefix):
-            split_string = pair[0].partition(prefix)
-            the_map[split_string[2]] = pair[1]
-    return the_map
+	the_map = {}
+	for pair in the_object.__dict__.iteritems():
+		if pair[0].startswith(prefix):
+			split_string = pair[0].partition(prefix)
+			the_map[split_string[2]] = pair[1]
+	return the_map
 
+
+# returns the number of elements that are the same in two lists starting from
+# the beginning of the list
 def common_list_length(list1, list2):
 	i = 0
 	while i < len(list1) and i < len(list2) and list1[i] == list2[i]:
 		i += 1
 	return i
 
+# types in kt:
+# Every variable in kt has a type - by default a variable has the generic
+# "variable" type, which can be assigned any value of any type.
+# Variables can also be declared with specific types that fall into
+# several categories.
+#
+# generic type: variable
+# basic types: integer (32 bit), float (64 bit), string
+# object references: soft and hard references.  Soft references are specified with
+# the '&' operator, hard references without.  Soft references are set to nil
+# when all hard references go out of scope
+# arrays, maps and strings are all hard reference types
+# arrays and maps: declared with [] and {}
+# arrays may also be specified with a constant size
+# compound types: structs
+# function and method signatures:
+#
+# how this breaks down
 
-class image:
-	def __init__(self, file_tree, image_name):
-		self.image_name = image_name
+class type_specifier:
+	def __init__(self):
+		pass
+
+
+def add_builtin_types(the_facet):
+	the_facet.variable_type_id = the_facet.add_builtin_type("variable")
+	the_facet.integer_type_id = the_facet.add_builtin_type("integer")
+	the_facet.float_type_id = the_facet.add_builtin_type("float")
+	the_facet.string_type_id = the_facet.add_builtin_type("string")
+
+# facet is a
+class facet:
+	def __init__(self, file_tree, facet_name):
+		self.string_constants = []
+		self.string_constant_lookup = {}
+		self.facet_name = facet_name
 		self.sorted_compounds = []
 		self.globals = {}
 		self.globals_list = []
@@ -51,14 +93,59 @@ class image:
 		root_ast_node = ast_node()
 		root_ast_node.name = ''
 		root_ast_node.type = 'object'
-		root = image.tree_node(None, "root", 'object', root_ast_node )
+		root = facet.tree_node(None, "root", 'object', root_ast_node )
 		self.add_global(root)
 		self.tree = root
 		self.next_label_id = 1
-		self.analyze_stmt_jump_table = build_jump_table(image, '_analyze_stmt_')
-		self.compile_stmt_jump_table = build_jump_table(image, '_compile_stmt_')
-		self.analyze_expr_jump_table = build_jump_table(image, '_analyze_expr_')
-		self.compile_expr_jump_table = build_jump_table(image, '_compile_expr_')
+		self.analyze_jump_table = build_jump_table_new(facet, '_analyze_')
+		self.compile_jump_table = build_jump_table_new(facet, '_compile_')
+
+		add_builtin_functions(self)
+		add_builtin_classes(self)
+
+		self.next_type_id = 0
+		self.type_list = []
+
+		add_builtin_types(self)
+
+	# add_type takes a parsed type_spec and returns an integer type id
+	# type_spec => [locator, is_array, is_reference, size_expr]
+	# if the array_expr is a non-constant expression,
+	class kt_type:
+		class kind:
+			basic_type = 0
+			reference_type = 1
+			object_type = 2
+			class_type = 3
+			record_type = 4
+			function_type = 5
+			array_type = 6
+			map_type = 7
+			
+
+		def init():
+			self.type_id = 0
+			self.tree_node = None
+
+	def add_builtin_type(self, type_name):
+		node = self.add_builtin_node("builtins/types/" + type_name, 'type')
+		node.type_id = self.next_type_id
+		new_type = facet.kt_type()
+		new_type.tree_node = node
+		new_type.type_id = node.type_id
+		new_type.type = facet.kt_type.kind.basic_type
+		self.type_list.append(new_type)
+		self.next_type_id += 1
+		return node
+
+	def add_type(self, type_spec):
+		if type_spec.type == 'locator_type_specifier':
+			node = self.find_node(type_spec, type_spec.locator)
+			if type_id in node:
+				return type_id
+			else:
+				# build a type
+				pass
 
 	class tree_node:
 		def __init__(self, container, name, type, decl):
@@ -125,6 +212,7 @@ class image:
 			self.node_vtable_index = node_vtable_index
 			self.arg_count = 0
 			self.register_count = 0
+			self.local_variable_count = 0
 			self.statements = None
 			self.has_override = False
 			self.parent_function_index = None
@@ -135,11 +223,12 @@ class image:
 			self.branch_targets = si.branch_targets
 			self.is_class_function = not si.references_instance_variables
 			self.register_count = si.register_count
+			self.local_variable_count = si.local_variable_count
 			self.returns_value = si.returns_value
 		def set_parent_function_index(self, parent_index):
 			self.parent_function_index = parent_index
 		def __str__(self):
-			ret = "Arg Count " + str(self.arg_count) + " Register Count " + str(self.register_count) + "\n"
+			ret = "Arg Count " + str(self.arg_count) + " Local Count " + str(self.local_variable_count) + " Register Count " + str(self.register_count) + "\n"
 			i = 0
 			for s in self.statements:
 				ret += str(i) + ": " + str(s) + "\n"
@@ -154,10 +243,12 @@ class image:
 			self.switch_count = 0
 			self.arg_count = 0
 			self.register_count = 0
+			self.local_variable_count = 0
 			self.needs_prev_scope = False
 			self.scope_needed = False
 			self.prev_scope = None
 			self.symbols = {}
+			self.register_types = []
 			self.statements = []
 			self.child_functions = []
 			self.branch_targets = {}
@@ -167,14 +258,32 @@ class image:
 			self.returns_value = False
 		def add_branch_target(self, ip):
 			self.branch_targets[ip] = self.next_branch_target
-			self.next_branch_target += 1			
+			self.next_branch_target += 1
+		def add_local_variable(self, ref_node, var_name, var_type_spec):
+			if var_name in self.symbols:
+				raise compile_error, (ref_node, "Variable " + var_name + " is declared more than once.")
+			self.symbols[var_name] = ('local', self.local_variable_count, var_type_spec)
+			self.local_variable_count += 1
+			print "Var decl: " + var_name
+		def add_register(self, register_type_spec):
+			register_index = self.register_count
+			self.register_count += 1
+			return register_index
 
 	def check_compound_record_unique(self, node):
 		# each compound 
 		if node.compound_record.origin_node != node:
-			new_info = image.compound_record(node)
+			new_info = facet.compound_record(node)
 			new_info.copy_from(node.compound_record)
 			node.compound_record = new_info
+
+	def add_string_constant(self, string_value):
+		if string_value in self.string_constant_lookup:
+			return self.string_constant_lookup[string_value]
+		index = len(self.string_constants)
+		self.string_constants.append(string_value)
+		self.string_constant_lookup[string_value] = index
+		return index
 
 	def add_slot(self, node, element):
 		self.check_compound_record_unique(node)
@@ -183,11 +292,11 @@ class image:
 		if the_slot:
 			raise compile_error, (element.decl, "Variable " + element.name + " already declared.")
 		slot_index = info.slot_count
-		the_slot = image.slot(initial_node = node, type='variable',name = element.name, index=slot_index, type_index=self.get_type_spec(element.decl))
+		the_slot = facet.slot(initial_node = node, type='variable',name = element.name, index=slot_index, type_index=self.get_type_spec(element.decl))
 		info.members[the_slot.name] = the_slot
 		info.slot_count += 1
 		
-		if(element.decl['assign_expr'] != None):
+		if element.decl['assign_expr'] is not None:
 			self.add_constructor_assignment(node, the_slot.index, element.decl['assign_expr'])
 
 	def find_slot(self, node, slot_name):
@@ -195,18 +304,19 @@ class image:
 
 	def add_sub_function_record(self, decl):
 		function_index = len(self.functions)
-		record = image.func_record(decl, None, None)
+		record = facet.func_record(decl, None, None)
 		self.functions.append(record)
 		return function_index
 	
 	def add_constructor_assignment(self, node, slot_index, assignment_expression):
 		node.assignments.append((slot_index, assignment_expression))
+
 	def build_constructor(self, node):
-		if len(node.assignments) != 0:
+		if len(node.assignments):
 			node.constructor_index = len(self.functions)
 			parent = node.parent_node
 			statements = []
-			if parent != None and parent.constructor_index != None:
+			if parent is not None and parent.constructor_index is not None:
 				parent_call = node.decl.parent_decl
 				parent_stmt = ast_node()
 				parent_stmt.type = 'expression_stmt'
@@ -228,7 +338,7 @@ class image:
 			constructor_decl.name = '__constructor'
 			constructor_decl.parameter_list = param_list
 			constructor_decl.statements = statements
-			the_func_record = image.func_record(constructor_decl, node, None)
+			the_func_record = facet.func_record(constructor_decl, node, None)
 			self.functions.append(the_func_record)
 			self.analyze_function(the_func_record, None)
 	
@@ -246,68 +356,70 @@ class image:
 			vtable_index = parent_func.index
 			self.functions[parent_func.global_function_index].has_override = True
 		else:
-		   parent_func = None
-		   vtable_index = node.compound_record.vtable_count
-		   node.compound_record.vtable_count += 1
+			parent_func = None
+			vtable_index = node.compound_record.vtable_count
+			node.compound_record.vtable_count += 1
 		if func_node.index is not None:
 			function_index = func_node.index
 			func_node.func_record = self.functions[function_index]
 		else:
 			function_index = len(self.functions)
-			func_node.func_record = image.func_record(decl, node, vtable_index)
+			func_node.func_record = facet.func_record(decl, node, vtable_index)
 			self.functions.append(func_node.func_record)
 
-		node.compound_record.members[decl.name] = image.slot(initial_node = node, type='function', name=decl.name,index=vtable_index,global_function_index=function_index)
+		node.compound_record.members[decl.name] = facet.slot(initial_node = node, type='function', name=decl.name,index=vtable_index,global_function_index=function_index)
 		if vtable_index == len(node.compound_record.vtable):
 			node.compound_record.vtable.append(self.functions[function_index])
 		else:
 			node.compound_record.vtable[vtable_index] = self.functions[function_index]
 
-	def build_tree_recurse_decl(self, image_node):
-		if 'body' in image_node.decl.__dict__ and image_node.decl.body != None:
-			for sub_decl in image_node.decl.body:
+	def build_tree_recurse_decl(self, facet_node):
+		if 'body' in facet_node.decl.__dict__ and facet_node.decl.body != None:
+			for sub_decl in facet_node.decl.body:
 				if 'primary_name' in sub_decl.__dict__:
 					sub_decl.name = sub_decl.primary_name + "".join(str(pair.string if pair.string is not None else "") + ":" for pair in sub_decl.selector_decl_list )
 					sub_decl.parameter_list = [pair.name for pair in sub_decl.selector_decl_list]
-				if 'name' in sub_decl.__dict__ and self.decl_in_image(sub_decl):
-					if sub_decl.name in image_node.contents:
-						raise compile_error, (image_node, "Redefinition of " + sub_decl.name + " in " + image_node.name + " not allowed.")
+				if 'name' in sub_decl.__dict__ and self.decl_in_facet(sub_decl):
+					if sub_decl.name in facet_node.contents:
+						raise compile_error, (facet_node, "Redefinition of " + sub_decl.name + " in " + facet_node.name + " not allowed.")
 					else:
-						new_node = image.tree_node(image_node, sub_decl.name, sub_decl.type, sub_decl)
-						image_node.contents[sub_decl.name] = new_node
+						new_node = facet.tree_node(facet_node, sub_decl.name, sub_decl.type, sub_decl)
+						facet_node.contents[sub_decl.name] = new_node
 						if new_node.is_compound():
 							self.add_global(new_node)
 						self.build_tree_recurse_decl(new_node)
-	def decl_in_image(self, decl):
-		if decl.__dict__.has_key('image_list') and decl.image_list is not None:
-			if (len(decl.image_list) != 0) and (self.image_name not in decl.image_list):
+
+	def decl_in_facet(self, decl):
+		if decl.__dict__.has_key('facet_list') and decl.facet_list is not None:
+			if (len(decl.facet_list) != 0) and (self.facet_name not in decl.facet_list):
 				return False
 		if decl.__dict__.has_key('transmission_list') and decl.transmission_list is not None:
-			# see if it's in the from_image or to_image of any transmission specifiers
-			if len(decl.transmission_list) and len(filter(decl.transmission_list, lambda x: x.from_image == self.image_name or x.to_image == self.image_name)) == 0:
+			# see if it's in the from_facet or to_facet of any transmission specifiers
+			if len(decl.transmission_list) and len(filter(decl.transmission_list, lambda x: x.from_facet == self.facet_name or x.to_facet == self.facet_name)) == 0:
 				return False
 		return True
+
 	def build_accept_reject_list(self, accept_list, reject_name_list, decl):
-		if decl.type == 'image':
-			if decl.name != self.image_name:
+		if decl.type == 'facet':
+			if decl.name != self.facet_name:
 				for sub_decl in decl.body:
 					reject_name_list.append(sub_decl.name)
 			else:
 				accept_list += decl.body
 		else:
-			if self.decl_in_image(decl):
+			if self.decl_in_facet(decl):
 				accept_list.append(decl)
 			else:
 				reject_name_list.append(decl.name)
 	def build_tree(self, file_tree):
 		self.build_tree_recurse(self.tree, file_tree)
-	def build_tree_recurse(self, image_node, file_node):
-		print "Recursing node: " + image_node.name
+	def build_tree_recurse(self, facet_node, file_node):
+		print "Recursing node: " + facet_node.name
 		files_and_dirs = [d for d in file_node.contents.values() if d.type == 'directory' or d.type == 'resource']
 		reject_list = []
 		decls_list = [] 
-		if 'body' in image_node.decl.__dict__ and image_node.decl.body != None:
-			for decl in image_node.decl.body:
+		if 'body' in facet_node.decl.__dict__ and facet_node.decl.body != None:
+			for decl in facet_node.decl.body:
 				self.build_accept_reject_list(decls_list, reject_list, decl)
 		for file in (k for k in file_node.contents.values() if k.type == 'kt'):
 			for decl in file.parse_result:
@@ -321,23 +433,23 @@ class image:
 			decl.body = []
 			decl.parent_decl = [parent]
 			decl.file_node = file
-			image_node.contents[file.name] = image.tree_node(image_node, file.name, 'object', decl)		
+			facet_node.contents[file.name] = facet.tree_node(facet_node, file.name, 'object', decl)
 		for decl in decls_list:
-			if decl.name in image_node.contents:
+			if decl.name in facet_node.contents:
 				# this is only allowed if the item in contents is a resource or directory;
 				# also it must have an empty body
-				existing_node = image_node.contents[decl.name]
+				existing_node = facet_node.contents[decl.name]
 				if existing_node.type != 'object' or decl.type != 'object' or 'file_node' not in existing_node.decl:
-					print "Redefinition of " + decl.name + " in " + image_node.name + " not allowed."
+					print "Redefinition of " + decl.name + " in " + facet_node.name + " not allowed."
 				else:
 					if decl.parent_decl != None and decl.parent_decl != existing_node.decl.parent_decl:
 						print "Parent type mismatch for object " + decl.name
 					else:
 						existing_node.decl.update(decl)
 			else:
-				image_node.contents[decl.name] = image.tree_node(image_node, decl.name, decl.type, decl)
+				facet_node.contents[decl.name] = facet.tree_node(facet_node, decl.name, decl.type, decl)
 		# now go back through the contents and recurse the children:
-		for node in image_node.contents.values():
+		for node in facet_node.contents.values():
 			# everything declared at the top level is added to the globals; otherwise, only compounds are added
 			self.add_global(node)
 			if 'file_node' in node.decl.__dict__:
@@ -365,7 +477,7 @@ class image:
 				decl.type = 'object'
 				decl.body = []
 				decl.parent_decl = ['directory' ]
-				new_node = image.tree_node(node, path[0], 'object', decl)
+				new_node = facet.tree_node(node, path[0], 'object', decl)
 				node.contents[path[0]] = new_node
 				node = new_node
 			path = path[2].partition('/')
@@ -374,20 +486,23 @@ class image:
 		symbol_decl = ast_node()
 		symbol_decl.type = node_type
 		symbol_decl.name = path[0]
-		symbol_node = image.tree_node(node, path[0], node_type, symbol_decl)
+		symbol_node = facet.tree_node(node, path[0], node_type, symbol_decl)
 		node.contents[path[0]] = symbol_node
 		self.add_global(symbol_node)
 		return symbol_node
+
 	def add_python_function(self, node_path, the_function):
 		new_node = self.add_builtin_node(node_path, 'python_function')
 		new_node.python_function = the_function
+
 	def add_python_class(self, node_path, the_class):
 		new_node = self.add_builtin_node(node_path, 'python_class')
 		new_node.python_class = the_class
-	def find_node(self, search_node, parent_name, filter_func = lambda x: True ):		
+
+	def find_node(self, search_node, parent_name, filter_func = lambda x: True ):
 		parent_part = parent_name.partition('/')			
 		if not self.globals.has_key(parent_part[0]):
-			print "Error, node named " + parent_part[0] + " is not in image " + self.image_name
+			print "Error, node named " + parent_part[0] + " is not in facet " + self.facet_name
 			return None
 		else:
 			node_list = []
@@ -403,12 +518,12 @@ class image:
 					else:
 						leaf_node = None
 						break
-				if leaf_node != None and filter_func(leaf_node):
-				   node_list.append(leaf_node)
-			if len(node_list) == 0:
+				if leaf_node is not None and filter_func(leaf_node):
+					node_list.append(leaf_node)
+			if not len(node_list):
 				return None
 			elif len(node_list) == 1:
-			    return node_list[0]
+				return node_list[0]
 			else:
 				# figure out which is the closest relative to search_node
 				search_ancestry = search_node.get_ancestry_list()
@@ -425,21 +540,18 @@ class image:
 						compiler_warning(None, "Node " + parent_name + " ambiguously resolves to multiple objects at same depth.")
 				return closest_node				
 
-	def get_type_spec(self, var_decl):
-		return 0
-	
 	def analyze_compound(self, node):
 		if node.process_pass == 1:
-			raise compile_error, (node.decl, "Error - compound " + node.name + " is part of a class definition cycle")
+			raise compile_error, (node.decl, "Error - compound " + node.name + " cannot be its own ancestor")
 		elif node.process_pass == 0:
 			node.process_pass = 1
 			# check if it has a parent class, and process that one first.
 			print "Processing compound: " + node.name + " with decl: " + str(node.decl)
 			parent = node.decl.parent_decl[0] if 'parent_decl' in node.decl.__dict__ and len(node.decl.parent_decl) > 0 else None
-			if parent != None:
+			if parent is not None:
 				print "node: " + node.name + " has parent: " + parent
 				parent_node = self.find_node(node, parent)
-				if parent_node == None:
+				if parent_node is None:
 					raise compile_error, (node.decl, "Could not find parent " + parent + " for compound " + node.name)
 				else:
 					print "processing parent: " + parent_node.name
@@ -450,8 +562,8 @@ class image:
 			# now that the parent node is processed, we can process this node
 			node.assignments = []
 			
-			if node.parent_node == None:
-				node.compound_record = image.compound_record(node)
+			if node.parent_node is None:
+				node.compound_record = facet.compound_record(node)
 			else:
 				node.compound_record = parent_node.compound_record
 			# first add any new functions and variable declarations 
@@ -488,7 +600,7 @@ class image:
 				self.analyze_function(func, None)
 			
 	def analyze_function(self, func, enclosing_scope):
-		si = image.semantic_info(self.next_label_id)
+		si = facet.semantic_info(self.next_label_id)
 		si.prev_scope = enclosing_scope
 		si.compound_node = func.node
 		decl = func.decl
@@ -509,8 +621,8 @@ class image:
 			return_stmt_decl = ast_node()
 			return_stmt_decl.type = 'return_stmt'
 			return_stmt_decl.return_expression_list = []
-			self._analyze_stmt_return_stmt(si, return_stmt_decl)
-			self._compile_stmt_return_stmt(si, return_stmt_decl, 0, 0)
+			self.return_stmt_analyze_(si, return_stmt_decl)
+			self.return_stmt_compile_(si, return_stmt_decl, 0, 0)
 		
 		func.set(si)
 		self.next_label_id = si.next_branch_target
@@ -528,21 +640,15 @@ class image:
 			self.compile_statement(si, stmt, continue_ip, break_ip)
 	
 	def analyze_statement(self, si, stmt):
-		if stmt.type in self.analyze_stmt_jump_table:
-			self.analyze_stmt_jump_table[stmt.type](self, si, stmt)
+		if stmt.type in self.analyze_jump_table:
+			self.analyze_jump_table[stmt.type](self, si, stmt)
 			
 	def compile_statement(self, si, stmt, continue_ip, break_ip):
-		if stmt.type in self.compile_stmt_jump_table:
-			self.compile_stmt_jump_table[stmt.type](self, si, stmt, continue_ip, break_ip)
+		if stmt.type in self.compile_jump_table:
+			self.compile_jump_table[stmt.type](self, si, stmt, continue_ip, break_ip)
 
-	def _analyze_stmt_variable_declaration_stmt(self, si, stmt):
-		var_name = stmt.name
-		if var_name in si.symbols:
-			raise compile_error, (stmt, "Variable " + var_name + " is declared more than once.")
-		si.symbols[var_name] = ('local', si.register_count)
-		si.register_count += 1
-		print "Var decl: " + stmt.name
-		
+	def variable_declaration_stmt_analyze_(self, si, stmt):
+		si.add_local_variable(stmt, stmt.name, stmt.type_spec)
 		# if the statement has an assignment expression, generate an assignment statement for the assignment
 		if stmt.assign_expr is not None:
 			assign_stmt = ast_node()
@@ -556,11 +662,11 @@ class image:
 			#print "  Adding assignment statement: " + str(assign_stmt)
 			stmt.assign_stmt = assign_stmt
 			self.analyze_statement(si, assign_stmt)
-	def _compile_stmt_variable_declaration_stmt(self, si, stmt, continue_ip, break_ip):
+	def variable_declaration_stmt_compile_(self, si, stmt, continue_ip, break_ip):
 		if 'assign_stmt' in stmt.__dict__:
 			self.compile_statement(si, stmt.assign_stmt, continue_ip, break_ip)
 	
-	def _analyze_stmt_function_declaration(self, si, stmt):
+	def function_declaration_analyze_(self, si, stmt):
 		func_name = stmt.name
 		#print "func decl: " + func_name
 		if func_name in si.symbols:
@@ -569,10 +675,10 @@ class image:
 		function_index = self.add_sub_function_record(stmt)
 		si.symbols[func_name] = ('sub_function', function_index)
 		si.child_functions.append(function_index)
-	def _compile_stmt_function_declaration(self, si, stmt, continue_ip, break_ip):
+	def function_declaration_compile(self, si, stmt, continue_ip, break_ip):
 		pass
 	
-	def _analyze_expr_function_expr(self, si, expr, valid_types, is_lvalue):
+	def function_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		si.function_expr_count += 1
 		func_name = "__func_expr_" + str(si.function_expr_count)
 		stmt = ast_node()
@@ -587,32 +693,34 @@ class image:
 		si.symbols[func_name] = ('sub_function', function_index)
 		si.child_functions.append(function_index)
 		expr.function_index = function_index
+		expr.result_register = si.add_register()
+		return expr.result_register
 
-	def _compile_expr_function_expr(self, si, expr, valid_types, is_lvalue):
-		return ('sub_function', expr.function_index)
+	def function_expr_compile_(self, si, expr, valid_types, is_lvalue):
+		return 'load_sub_function', expr.result_register, expr.function_index
 
-	def _analyze_stmt_continue_stmt(self, si, stmt):
+	def continue_stmt_analyze_(self, si, stmt):
 		if si.loop_count == 0:
 			raise compile_error, (stmt, "continue not allowed outside of a loop.")
 		si.ip += 1
 		#print "continue stmt"
-	def _compile_stmt_continue_stmt(self, si, stmt, continue_ip, break_ip):
+	def continue_stmt_compile_(self, si, stmt, continue_ip, break_ip):
 		si.statements.append(('branch_always', continue_ip))
 		si.add_branch_target(continue_ip)
 		
-	def _analyze_stmt_break_stmt(self, si, stmt):
+	def break_stmt_analyze_(self, si, stmt):
 		if si.loop_count == 0 and si.switch_count == 0:
 			raise compile_error, (stmt, "break not allowed outside of a loop or switch.")
 		si.ip += 1
 		#print "break stmt"
-	def _compile_stmt_break_stmt(self, si, stmt, continue_ip, break_ip):
+	def break_stmt_compile_(self, si, stmt, continue_ip, break_ip):
 		si.statements.append(('branch_always', break_ip))
 		si.add_branch_target(break_ip)
 		
-	def _analyze_stmt_switch_stmt(self, si, stmt):
+	def switch_stmt_analyze_(self, si, stmt):
 		# save the expression result in a register
-		stmt.expr_register = si.register_count
-		si.register_count += 1
+
+		stmt.expr_register = si.add_register()
 		si.switch_count += 1
 		# the basic form of the switch statement is to evaluate
 		# the switch expression into the temporary register (first instruction)
@@ -630,13 +738,14 @@ class image:
 		stmt.break_ip = si.ip
 		si.switch_count -= 1
 		
-	def _compile_stmt_switch_stmt(self, si, stmt, continue_ip, break_ip):
+	def switch_stmt_compile_(self, si, stmt, continue_ip, break_ip):
 		switch_start = len(si.statements)
 		test_register = stmt.expr_register
 		si.statements.append( ('eval', ('assign', ('local', test_register), self.compile_expression(si, stmt.test_expression, ('any'), False))))
 		# reserve cascading statement list for the test expressions and final branch
 		si.statements = si.statements + [None] * (len(stmt.element_list) + 1)
 		index = 1
+
 		def build_compare(expr):
 			return ('bool_binary', 'compare_equal', ('local', test_register ), self.compile_expression(si, expr, ('any'), False))
 			
@@ -656,7 +765,7 @@ class image:
 		if stmt.default_block is not None:
 			self.compile_block(si, stmt.default_block, continue_ip, stmt.break_ip)
 		
-	def _analyze_stmt_if_stmt(self, si, stmt):
+	def if_stmt_analyze_(self, si, stmt):
 		#print "if stmt" + str(stmt)
 		self.analyze_expression(si, stmt.test_expression, ('bool'), False)
 		si.ip += 1
@@ -668,7 +777,7 @@ class image:
 			stmt.if_true_jump = si.ip
 		else:
 			stmt.if_false_jump = si.ip
-	def _compile_stmt_if_stmt(self, si, stmt, continue_ip, break_ip):
+	def if_stmt_compile_(self, si, stmt, continue_ip, break_ip):
 		si.statements.append(('branch_if_zero', stmt.if_false_jump, self.compile_boolean_expression(si, stmt.test_expression)))
 		si.add_branch_target(stmt.if_false_jump)
 		self.compile_block(si, stmt.if_block, continue_ip, break_ip)
@@ -677,7 +786,7 @@ class image:
 			si.add_branch_target(stmt.if_true_jump)
 			self.compile_block(si, stmt.else_block, continue_ip, break_ip)
 	
-	def _analyze_stmt_while_stmt(self, si, stmt):
+	def while_stmt_analyze_(self, si, stmt):
 		si.loop_count += 1
 		self.analyze_expression(si, stmt.test_expression, ('bool'), False)
 		stmt.continue_ip = si.ip
@@ -687,12 +796,12 @@ class image:
 		stmt.break_ip = si.ip
 
 		si.loop_count -= 1
-	def _compile_stmt_while_stmt(self, si, stmt, continue_ip, break_ip):
+	def while_stmt_compile_(self, si, stmt, continue_ip, break_ip):
 		si.statements.append(('branch_if_zero', stmt.break_ip, self.compile_boolean_expression(si, stmt.test_expression)))
 		si.add_branch_target(stmt.break_ip)
 		self.compile_block(si, stmt.statement_list, stmt.continue_ip, stmt.break_ip)
 
-	def _analyze_stmt_do_while_stmt(self, si, stmt):
+	def do_while_stmt_analyze_(self, si, stmt):
 		si.loop_count += 1
 		stmt.start_ip = si.ip
 		self.analyze_block(si, stmt.statement_list)
@@ -701,20 +810,15 @@ class image:
 		stmt.break_ip = si.ip
 		self.analyze_expression(si, stmt.test_expression, ('bool'), False)
 		si.loop_count -= 1
-	def _compile_stmt_do_while_stmt(self, si, stmt, continue_ip, break_ip):
+	def do_while_stmt_compile_(self, si, stmt, continue_ip, break_ip):
 		self.compile_block(si, stmt.statement_list, stmt.continue_ip, stmt.break_ip)
 		si.statements.append(('branch_if_nonzero', stmt.start_ip, self.compile_boolean_expression(si, stmt.test_expression)))
 		si.add_branch_target(stmt.start_ip)
-	def _analyze_stmt_for_stmt(self, si, stmt):
+	def for_stmt_analyze_(self, si, stmt):
 		#print "for stmt" + str(stmt)
 		si.loop_count += 1
-		if 'variable_initializer' in stmt.__dict__:			
-			var_name = stmt.variable_initializer
-			if var_name in si.symbols:
-				raise compile_error, (stmt, "Variable " + var_name + " is declared more than once.")
-			si.symbols[var_name] = ('local', si.variable_register_count, stmt.variable_type_spec)
-			si.variable_register_count += 1
-			print "Var decl: " + stmt.name
+		if 'variable_initializer' in stmt.__dict__:
+			si.add_local_variable(stmt, stmt.variable_initializer, stmt.variable_type_spec)
 		if 'init_expression' in stmt.__dict__:
 			self.analyze_expression(si, stmt.init_expression, ('any'), False)
 			si.ip += 1
@@ -731,7 +835,7 @@ class image:
 		stmt.loop_start_ip = loop_start_ip
 		stmt.break_ip = si.ip
 		si.loop_count -= 1
-	def _compile_stmt_for_stmt(self, si, stmt, continue_ip, break_ip):
+	def for_stmt_compile_(self, si, stmt, continue_ip, break_ip):
 		if 'init_expression' in stmt.__dict__:
 			si.statements.append(('eval', self.compile_void_expression(si, stmt.init_expression)))
 		si.statements.append(('branch_if_zero', stmt.break_ip, self.compile_boolean_expression(si, stmt.test_expression)))
@@ -742,26 +846,28 @@ class image:
 		si.statements.append(('branch_always', stmt.loop_start_ip))
 		si.add_branch_target(stmt.loop_start_ip)
 		
-	def _analyze_stmt_return_stmt(self, si, stmt):
+	def return_stmt_analyze_(self, si, stmt):
 		#print "return stmt" + str(stmt)
 		for expr in stmt.return_expression_list:
 			self.analyze_expression(si, expr, ('any'), False)
 			si.returns_value = True
 		si.ip += 1
-	def _compile_stmt_return_stmt(self, si, stmt, continue_ip, break_ip):
+	def return_stmt_compile_(self, si, stmt, continue_ip, break_ip):
 		si.statements.append(('return', self.compile_expression_list(si, stmt.return_expression_list)))
 
-	def _analyze_stmt_expression_stmt(self, si, stmt):
+	def expression_stmt_analyze_(self, si, stmt):
 		#print "expression stmt" + str(stmt)
 		self.analyze_expression(si, stmt.expr, ('any'), False)
 		si.ip += 1
-	def _compile_stmt_expression_stmt(self, si, stmt, continue_ip, break_ip):
+
+	def expression_stmt_compile_(self, si, stmt, continue_ip, break_ip):
 		si.statements.append(('eval', self.compile_void_expression(si, stmt.expr)))
 	
-	def _analyze_stmt_initializer_stmt(self, si, stmt):
+	def initializer_stmt_analyze_(self, si, stmt):
 		self.analyze_expression(si, stmt.value, ('any'), False)
 		si.ip += 1
-	def _compile_stmt_initializer_stmt(self, si, stmt, continue_ip, break_ip):
+
+	def initializer_stmt_compile_(self, si, stmt, continue_ip, break_ip):
 		si.statements.append(('eval', ('assign', ('ivar', stmt.slot),
 									   self.compile_expression(si, stmt.value, ('any'), False) )))
 
@@ -779,19 +885,19 @@ class image:
 		if is_lvalue and expr.type not in ('locator_expr', 'array_index_expr', 'slot_expr'):
 			raise compile_error, (expr, "Expression is not an l-value.")
 		print str(expr)
-		if expr.type in self.analyze_expr_jump_table:
-			self.analyze_expr_jump_table[expr.type](self, si, expr, valid_types, is_lvalue)
+		if expr.type in self.analyze_jump_table:
+			self.analyze_jump_table[expr.type](self, si, expr, valid_types, is_lvalue)
 		
 	def compile_expression(self, si, expr, valid_types, is_lvalue):
-		if expr.type in self.compile_expr_jump_table:
-			return self.compile_expr_jump_table[expr.type](self, si, expr, valid_types, is_lvalue)
+		if expr.type in self.compile_jump_table:
+			return self.compile_jump_table[expr.type](self, si, expr, valid_types, is_lvalue)
 		else:
 			return expr
 		
-	def _compile_expr_selfmethod_global_expr(self, si, expr, valid_types, is_lvalue):
-		return ('selfmethod_global', expr.func_index)
+	def selfmethod_global_expr_compile_(self, si, expr, valid_types, is_lvalue):
+		return 'selfmethod_global', expr.func_index
 	
-	def _analyze_expr_locator_expr(self, si, expr, valid_types, is_lvalue):
+	def locator_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		locator_name = expr.string
 		if locator_name in si.symbols:
 			expr.location = si.symbols[locator_name]
@@ -815,38 +921,39 @@ class image:
 			expr.location = ('global_node', node)
 			if is_lvalue:
 				raise compile_error, (expr, "Global object " + locator_name + " cannot be assigned a value.")
-	def _compile_expr_locator_expr(self, si, expr, valid_types, is_lvalue):
+	def locator_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		#print str(expr)
 		return expr.location
 
-	def _compile_expr_int_constant_expr(self, si, expr, valid_types, is_lvalue):
-		return ('int_constant', expr.value)
+	def int_constant_expr_compile_(self, si, expr, valid_types, is_lvalue):
+		return 'int_constant', expr.value
 	
-	def _compile_expr_float_constant_expr(self, si, expr, valid_types, is_lvalue):
-		return ('float_constant', expr.value)
+	def float_constant_expr_compile_(self, si, expr, valid_types, is_lvalue):
+		return 'float_constant', expr.value
 	
-	def _compile_expr_string_constant(self, si, expr, valid_types, is_lvalue):
-		return ('string_constant', expr.value)
+	def string_constant_compile_(self, si, expr, valid_types, is_lvalue):
+		index = self.add_string_constant(expr.value)
+		return 'string_constant', index
 	
-	def _analyze_expr_array_index_expr(self, si, expr, valid_types, is_lvalue):
+	def array_index_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr.array_expr, ('any'), False)
 		self.analyze_expression(si, expr.index_expr, ('any'), False)
 	
-	def _compile_expr_array_index_expr(self, si, expr, valid_types, is_lvalue):
+	def array_index_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		return ('array_index', self.compile_expression(si, expr.array_expr, ('any'), False), 
 			    self.compile_expression(si, expr.index_expr, ('any'), False))
 	
-	def _analyze_expr_func_call_expr(self, si, expr, valid_types, is_lvalue):
+	def func_call_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr.func_expr, ('callable'), False)
 		for arg in expr.args:
 			self.analyze_expression(si, arg, ('any'), False)
-	def _compile_expr_func_call_expr(self, si, expr, valid_types, is_lvalue):
+	def func_call_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		arg_array = []
 		for arg in expr.args:
 			arg_array.append(self.compile_expression(si, arg, ('any'), False) )
 		return ('func_call', self.compile_expression(si, expr.func_expr, ('callable'), False), arg_array)
 	
-	def _analyze_expr_method_call(self, si, expr, valid_types, is_lvalue):
+	def method_call_analyze_(self, si, expr, valid_types, is_lvalue):
 		args = [pair.expr for pair in expr.selector_list]
 		sel_str = expr.primary_name + "".join(str(pair.string if pair.string is not None else "") + ":" for pair in expr.selector_list )
 		print "Got selector: " + sel_str
@@ -855,17 +962,17 @@ class image:
 		expr.func_expr.object_expr = expr.object_expr
 		expr.func_expr.slot_name = sel_str
 		expr.args = args
-		self._analyze_expr_func_call_expr(si, expr, valid_types, is_lvalue)
+		self.func_call_expr_analyze_(si, expr, valid_types, is_lvalue)
 		
-	def _compile_expr_method_call(self, si, expr, valid_types, is_lvalue):
-		return self._compile_expr_func_call_expr(si, expr, valid_types, is_lvalue)
+	def method_call_compile_(self, si, expr, valid_types, is_lvalue):
+		return self.func_call_expr_compile_(si, expr, valid_types, is_lvalue)
 		
-	def _analyze_expr_slot_expr(self, si, expr, valid_types, is_lvalue):
+	def slot_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		object_expr = expr.object_expr
 		if(object_expr.type == 'locator_expr' and object_expr.string == 'parent'):
 			# parent references a function slot in the parent class
 			parent_node = si.compound_node.parent_node
-			if parent_node == None:
+			if parent_node is None:
 				raise compile_error, (expr, "Compound " + si.compound_node.name + " has no declared parent.")
 			parent_record = parent_node.compound_record
 			if expr.slot_name not in parent_record.members:
@@ -874,59 +981,59 @@ class image:
 			if slot.type != 'function':
 				raise compile_error, (expr, "parent expression must reference a function.")
 			expr.parent_function_index = slot.global_function_index
- 		else:
- 			self.analyze_expression(si, expr.object_expr, ('any'), False)
-	def _compile_expr_slot_expr(self, si, expr, valid_types, is_lvalue):
+		else:
+			self.analyze_expression(si, expr.object_expr, ('any'), False)
+	def slot_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		if 'parent_function_index' in expr:
 			return ('selfmethod_global', expr.parent_function_index)
 		else:
 			return ('slot', self.compile_expression(si, expr.object_expr, ('any'), False), expr.slot_name)
 	
-	def _analyze_expr_unary_lvalue_op_expr(self, si, expr, valid_types, is_lvalue):
+	def unary_lvalue_op_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr.expression, ('number'), True)
-	def _compile_expr_unary_lvalue_op_expr(self, si, expr, valid_types, is_lvalue):
+	def unary_lvalue_op_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		return ('unary_lvalue_op', self.compile_expression(si, expr.expression, ('number'), True), expr.op)
 	
-	def _analyze_expr_unary_minus_expr(self, si, expr, valid_types, is_lvalue):
+	def unary_minus_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr.expression, ('number'), False)
-	def _compile_expr_unary_minus_expr(self, si, expr, valid_types, is_lvalue):
+	def unary_minus_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		return ('unary_minus', self.compile_expression(si, expr, ('number'), False))
 	
-	def _analyze_expr_logical_not_expr(self, si, expr, valid_types, is_lvalue):
+	def logical_not_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr.expression, ('boolean'), False)	
-	def _compile_expr_logical_not_expr(self, si, expr, valid_types, is_lvalue):
+	def logical_not_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		return ('logical_not', self.compile_expression(si, expr, ('boolean'), False))
 		
-	def _analyze_expr_bitwise_not_expr(self, si, expr, valid_types, is_lvalue):
+	def bitwise_not_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr.expression, ('integer'), False)	
-	def _compile_expr_bitwise_not_expr(self, si, expr, valid_types, is_lvalue):
+	def bitwise_not_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		return ('bitwise_not', self.compile_expression(si, expr, ('integer'), False))
 
-	def _analyze_expr_float_binary_expr(self, si, expr, valid_types, is_lvalue):
+	def float_binary_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr.left, ('number'), False)
 		self.analyze_expression(si, expr.right, ('number'), False)
-	def _compile_expr_float_binary_expr(self, si, expr, valid_types, is_lvalue):
+	def float_binary_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		return ('float_binary', expr.op, 
 			    self.compile_expression(si, expr.left, ('number'), False),
 			    self.compile_expression(si, expr.right, ('number'), False))
 
-	def _analyze_expr_int_binary_expr(self, si, expr, valid_types, is_lvalue):
+	def int_binary_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr.left, ('integer'), False)
 		self.analyze_expression(si, expr.right, ('integer'), False)
-	def _compile_expr_int_binary_expr(self, si, expr, valid_types, is_lvalue):
+	def int_binary_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		return ('int_binary', expr.op, 
 			    self.compile_expression(si, expr.left, ('integer'), False),
 			    self.compile_expression(si, expr.right, ('integer'), False))
 
-	def _analyze_expr_bool_binary_expr(self, si, expr, valid_types, is_lvalue):
+	def bool_binary_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr.left, ('boolean'), False)
 		self.analyze_expression(si, expr.right, ('boolean'), False)
-	def _compile_expr_bool_binary_expr(self, si, expr, valid_types, is_lvalue):
+	def bool_binary_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		return ('bool_binary', expr.op, 
 			    self.compile_expression(si, expr.left, ('boolean'), False),
 			    self.compile_expression(si, expr.right, ('boolean'), False))
 
-	def _analyze_expr_strcat_expr(self, si, expr, valid_types, is_lvalue):
+	def strcat_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr.left, ('string'), False)
 		self.analyze_expression(si, expr.right, ('string'), False)
 	def get_cat_str(self, expr):
@@ -941,61 +1048,61 @@ class image:
 			return "\t"
 		else:
 			raise compile_error, (expr, "Unknown string cat operator" + str(str_op))
-	def _compile_expr_strcat_expr(self, si, expr, valid_types, is_lvalue):
+	def strcat_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		return ('strcat', self.get_cat_str(expr), 
 			    self.compile_expression(si, expr.left, ('string'), False),
 			    self.compile_expression(si, expr.right, ('string'), False))
 
-	def _analyze_expr_conditional_expr(self, si, expr, valid_types, is_lvalue):
+	def conditional_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr.test_expression, ('boolean'), False)
 		self.analyze_expression(si, expr.true_expression, valid_types, False)
 		self.analyze_expression(si, expr.false_expression, valid_types, False)
-	def _compile_expr_conditional_expr(self, si, expr, valid_types, is_lvalue):
+	def conditional_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		return ('conditional',
 				self.compile_expression(si, expr.test_expression, ('boolean'), False),
 				self.compile_expression(si, expr.true_expression, valid_types, False),
 				self.compile_expression(si, expr.false_expression, valid_types, False))
 		
-	def _analyze_expr_assign_expr(self, si, expr, valid_types, is_lvalue):
+	def assign_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr.left, ('any'), True)
 		self.analyze_expression(si, expr.right, ('any'), False)
-	def _compile_expr_assign_expr(self, si, expr, valid_types, is_lvalue):
+	def assign_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		return ('assign',
 			    self.compile_expression(si, expr.left, ('any'), True),
 			    self.compile_expression(si, expr.right, ('any'), False))
 	
-	def _analyze_expr_float_assign_expr(self, si, expr, valid_types, is_lvalue):
+	def float_assign_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr.left, ('number'), True)
 		self.analyze_expression(si, expr.right, ('number'), False)
-	def _compile_expr_float_assign_expr(self, si, expr, valid_types, is_lvalue):
+	def float_assign_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		return ('float_assign', expr.op, 
 			    self.compile_expression(si, expr.left, ('number'), True),
 			    self.compile_expression(si, expr.right, ('number'), False))
 
-	def _analyze_expr_int_assign_expr(self, si, expr, valid_types, is_lvalue):
+	def int_assign_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		self.analyze_expression(si, expr.left, ('integer'), True)
 		self.analyze_expression(si, expr.right, ('integer'), False)
-	def _compile_expr_int_assign_expr(self, si, expr, valid_types, is_lvalue):
+	def int_assign_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		return ('int_assign', expr.op, 
 			    self.compile_expression(si, expr.left, ('integer'), True),
 			    self.compile_expression(si, expr.right, ('integer'), False))
 	
-	def _analyze_expr_array_expr(self, si, expr, valid_types, is_lvalue):
+	def array_expr_analyze(self, si, expr, valid_types, is_lvalue):
 		if is_lvalue:
 			raise compile_error, (expr, "Array initializer cannot be an lvalue.")
 		for sub_expr in expr.array_values:
 			self.analyze_expression(si, sub_expr, ('any'), False)
 			
-	def _compile_expr_array_expr(self, si, expr, valid_types, is_lvalue):
+	def array_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		return ('array', [self.compile_expression(si, sub_expr, ('any'), False) for sub_expr in expr['array_values']])
 	
-	def _analyze_expr_map_expr(self, si, expr, valid_types, is_lvalue):
+	def map_expr_analyze_(self, si, expr, valid_types, is_lvalue):
 		if is_lvalue:
 			raise compile_error, (expr, "Map initializer cannot be an lvalue.")
 		for pair in expr.map_pairs:
 			self.analyze_expression(si, pair.key, ('any'), False)
 			self.analyze_expression(si, pair.value, ('any'), False)
 	
-	def _compile_expr_map_expr(self, si, expr, valid_types, is_lvalue):
+	def map_expr_compile_(self, si, expr, valid_types, is_lvalue):
 		return ('map', [(self.compile_expression(si, pair.key, ('any'), False), self.compile_expression(si, pair.value, ('any'), False)) for pair in expr.map_pairs])
 		

@@ -1,12 +1,12 @@
 function test_function()
-	var part1 = "hello"
-	var part2 = ", world!"
+	var part1: string = "hello"
+	var part2: string = ", world!"
 
 	function get_letter(index)
 		return part2[index]
 	
 	var result = part1
-	var i
+	var i: integer
 
 	for i = 0; part2[i]; i += 1
 		print(i)
