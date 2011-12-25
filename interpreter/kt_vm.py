@@ -299,7 +299,7 @@ class vm:
 		method = self.facet.functions[global_index]
 		return (vm.function_record_instance(method), reference_object)
 	def _eval_ivar(self, ivar_index):
- 		return self.tos.reference_object.slots[ivar_index]
+		return self.tos.reference_object.slots[ivar_index]
 
 	#slot_expr
 	#   object_expr
@@ -307,32 +307,32 @@ class vm:
 	def _eval_slot(self, object_expr, slot_name):
 		the_object = self.eval(object_expr)
 		the_slot = the_object.id.members[slot_name]
- 		if the_slot.type == 'variable':
- 			return the_object.slots[the_slot.index]
-  		elif the_slot.type == 'function':
-  			return (vm.function_record_instance(the_object.id.vtable[the_slot.index]), the_object)
+		if the_slot.type == 'variable':
+			return the_object.slots[the_slot.index]
+		elif the_slot.type == 'function':
+			return (vm.function_record_instance(the_object.id.vtable[the_slot.index]), the_object)
 	
-   	#conditional_expr
-   	#   test_expression
-   	#   true_expression
-   	#   false_expression
-   	# ('conditional', test_expr, true_expr, false_expr)
-   	def _eval_conditional(self, test_expr, true_expr, false_expr):
+	#conditional_expr
+	#   test_expression
+	#   true_expression
+	#   false_expression
+	# ('conditional', test_expr, true_expr, false_expr)
+	def _eval_conditional(self, test_expr, true_expr, false_expr):
 		value = self.eval(test_expr)
 		if value != 0:
 			return self.eval(true_expr)
 		else:
 			return self.eval(false_expr)
  
- 	#array_expr
- 	#   array_values
- 	# ('array', [array_values])
- 	def _eval_array(self, array_values_list):
- 		result = []
- 		for expr in array_values_list:
- 			sub_result = self.eval(expr)
- 			result.append(sub_result)
- 		return result
+	#array_expr
+	#   array_values
+	# ('array', [array_values])
+	def _eval_array(self, array_values_list):
+		result = []
+		for expr in array_values_list:
+			sub_result = self.eval(expr)
+			result.append(sub_result)
+		return result
 
 	#map_expr
 	#   map_pairs

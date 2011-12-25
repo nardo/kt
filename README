@@ -39,6 +39,10 @@ from the e programming language, kt natively supports promise and deferred when-
 Tight binding with C/C++: kt is designed to have low overhead call in/call out to C/C++ as well 
 as easy integration of new native data types and classes.
 
+Other reasonable but not so core features include:
+- ability to invoke (and declare) methods using Objective-C-styled method descriptions -
+  [obj doSomething: foo withParameter: bar] - to have super clean bindings with iOS/OS X
+
 directory structure overview:
 
 parser:
@@ -47,9 +51,13 @@ parser:
 	based parser.
 
 interpreter:
-	the bulk of the kt language platform prototype - program structure and
-	semantic analysis, compilation to intermediate language representation
-	and virtual machine.
+	the bulk of the kt language platform prototype - The kt interpreter scans 
+	a kt project as a whole, parsing all .kt files it discovers, and for each facet 
+	referenced in the program, generates a full program tree.  This program tree is
+	then analyzed for semantic correctness, and can be executed/evaluated directly 
+	from a "compiled" intermediate language, or compiled into a C++ program.  The
+	C++ compilation step is not fully functional, and will soon entirely replace
+	the interpreted intermediate language.
 
 test:
 	test cases for various language features.

@@ -26,13 +26,13 @@ class node_python_function (program_node):
 	def __init__(self, the_python_function):
 		self.python_function = the_python_function
 
-def analyze_block(si, statement_list):
+def analyze_block(func, statement_list):
 	for stmt in statement_list:
-		stmt.analyze(si)
+		stmt.analyze(func)
 
-def compile_block(si, statement_list, continue_ip, break_ip):
+def compile_block(func, statement_list, continue_ip, break_ip):
 	for stmt in statement_list:
-		stmt.compile(si, continue_ip, break_ip)
+		stmt.compile(func, continue_ip, break_ip)
 
 from kt_program_declarations import *
 from kt_program_function_decl import *

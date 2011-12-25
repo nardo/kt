@@ -92,11 +92,18 @@ class facet:
 
 		print "Analyzing Functions"
 		for func in self.functions:
-			func.analyze_function(None, self)
+			func.analyze_function(self)
+
+		print "Compiling Functions"
+		for func in self.functions:
+			func.compile_function()
+
 
 	def add_function(self, the_function):
 		func_index = len(self.functions)
 		self.functions.append(the_function)
+		the_function.function_index = func_index
+		the_function.facet = self
 		return func_index
 
 	def get_function_by_index(self, index):
