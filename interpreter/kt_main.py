@@ -25,8 +25,8 @@ def test():
 		new_facet = facet(facet_name)
 		new_facet.process(file_tree)
 
-		the_vm = vm(new_facet)
-		the_vm.exec_function("main", ())
+		# the_vm = vm(new_facet)
+		# the_vm.exec_function("main", ())
 			
 			#the_code_generator = code_generator(new_facet)
 			#the_code_generator.go()

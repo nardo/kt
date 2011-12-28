@@ -33,22 +33,8 @@ def common_list_length(list1, list2):
 # function and method signatures:
 #
 # how this breaks down
-class type_specifier:
-	def __init__(self):
-		pass
 
-class kt_type:
-	class kind:
-		basic_type = 0
-		reference_type = 1
-		object_type = 2
-		class_type = 3
-		record_type = 4
-		function_type = 5
-		array_type = 6
-		map_type = 7
-
-class node_basic_type (program_node):
+class node_basic_type (type_specifier):
 	def __init__(self, type_id):
 		self.type_id = type_id
 		self.type = kt_type.kind.basic_type
@@ -94,10 +80,38 @@ class facet:
 		for func in self.functions:
 			func.analyze_function(self)
 
-		print "Compiling Functions"
-		for func in self.functions:
-			func.compile_function()
+		# output the compiled code
+		emit_string = self.emit_standard_includes() +\
+					self.emit_string_table() +\
+					"struct program {\n" +\
+					self.emit_classdefs() +\
+					self.emit_functions() +\
+					"};\n"
+		print "Facet compiles to:\n"
+		print emit_string
 
+	def emit_standard_includes(self):
+		return "#include \"standard_library.h\"\n"
+
+	def emit_string_table(self):
+		emit_string = "kt_string_constant __string_constants[" + str(len(self.string_constants)) + "] = {\n"
+		for const_index in range(len(self.string_constants)):
+			const_str = self.string_constants[const_index]
+			emit_string += "{ " + str(len(const_str)) + ", \"" + const_str + "\"},\n"
+		emit_string += "};\n"
+		return emit_string
+
+	def emit_classdefs(self):
+		result = ""
+		for c in self.sorted_containers:
+			result += c.emit_classdef()
+		return result
+
+	def emit_functions(self):
+		return ""
+		#print "Compiling Functions"
+		#for func in self.functions:
+		#	func.compile_function()
 
 	def add_function(self, the_function):
 		func_index = len(self.functions)

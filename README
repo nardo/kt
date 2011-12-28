@@ -69,6 +69,9 @@ license:
 media:
 	media/branding around language and environment.
 
+kt depends on the "core" library - https://github.com/nardo/core - to build the parser.
+In order to build properly, core and kt should live in the same directory.
+
 To test it all out, just run the test.sh in the root directory - it will
 build the parser and execute the first unit test which should echo a bunch
 of debug messages and a simple greeting.

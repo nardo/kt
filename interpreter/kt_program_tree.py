@@ -22,6 +22,22 @@ class program_node:
 	def is_function(self):
 		return False
 
+class type_specifier(program_node):
+	class kind:
+		invalid_type = -1
+		basic_type = 0
+		reference_type = 1
+		object_type = 2
+		class_type = 3
+		record_type = 4
+		function_type = 5
+		array_type = 6
+		map_type = 7
+	def type_kind(self):
+		return invalid_type
+
+	pass
+
 class node_python_function (program_node):
 	def __init__(self, the_python_function):
 		self.python_function = the_python_function

@@ -13,6 +13,14 @@
 #include <objc/runtime.h>
 #include <Foundation/NSBundle.h>
 
+
+#include "core/platform.h"
+namespace core
+{
+#include "core/core.h"
+};
+
+
 void objc_test()
 {
 	NSBundle *bundle = [[NSBundle alloc] initWithPath: @"/System/Library/Frameworks/AppKit.framework"];

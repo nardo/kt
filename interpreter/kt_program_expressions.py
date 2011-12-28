@@ -74,9 +74,11 @@ class node_float_constant_expr(node_expression):
 		return 'float_constant', self.value
 
 class node_string_constant(node_expression):
+	def analyze(self, func, valid_types):
+		self.string_index = func.facet.add_string_constant(self.value)
+
 	def compile(self, func, valid_types):
-		index = func.facet.add_string_constant(self.value)
-		return 'string_constant', index
+		return 'string_constant', string_index
 
 class node_strcat_expr(node_expression):
 	def analyze(self, func, valid_types):

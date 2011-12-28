@@ -6,19 +6,19 @@ class slot:
 	variable_slot = 0
 	function_slot = 1
 
-	def __init__(self, initial_node, type, name, index, global_function_index=0,type_index=0):
+	def __init__(self, initial_node, type, name, index, global_function_index=0,type_spec=None):
 		self.name = name
 		self.type = type
 		self.index = index
 		self.initial_node = initial_node
 		self.global_function_index = global_function_index
-		self.type_index = type_index
+		self.type_spec = type_spec
 	def is_variable(self):
 		return self.type == slot.variable_slot
 	def is_function(self):
 		return self.type == slot.function_slot
 	def __str__(self):
-		return "(" + str(self.type) + " " + self.name + ": " + str((self.index, self.global_function_index, self.type_index)) + ")"
+		return "(" + str(self.type) + " " + self.name + ": " + str((self.index, self.global_function_index, self.type_spec)) + ")"
 
 class container_node (program_node):
 	def __init__(self):
@@ -35,6 +35,12 @@ class container_node (program_node):
 		
 	def is_container(self):
 		return True
+
+	def emit_classdef(self):
+		emit_string = "struct " + self.get_c_classname() + "{\n"
+		for member in self.members:
+			if member.initial_node == self:
+				emit_string += member.type_decl.get_c_type_string() + " " + member.name
 
 	def set_member_info_from(self, parent):
 		self.members = parent.members
@@ -58,8 +64,7 @@ class container_node (program_node):
 		if the_slot:
 			raise compile_error, (element, "Variable " + element.name + " already declared.")
 		slot_index = self.slot_count
-		the_slot = slot(initial_node = self, type= slot.variable_slot, name = element.name, index=slot_index,
-		                type_index=self.get_type_spec(element.decl))
+		the_slot = slot(initial_node = self, type= slot.variable_slot, name = element.name, index=slot_index, type_spec=element.type_spec)
 		self.members[the_slot.name] = the_slot
 		self.slot_count += 1
 
@@ -203,13 +208,13 @@ class node_transmission_specifier (program_node):
 class node_type(program_node):
 	pass
 
-class node_locator_type_specifier(program_node):
+class node_locator_type_specifier(type_specifier):
 	pass
 
-class node_reference_type_specifier(program_node):
+class node_reference_type_specifier(type_specifier):
 	pass
 
-class node_array_type_specifier(program_node):
+class node_array_type_specifier(type_specifier):
 	pass
 
 class node_slot_assignment(program_node):

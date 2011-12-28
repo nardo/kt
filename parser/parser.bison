@@ -415,7 +415,7 @@ variable_declaration
          field($$, is_shared, $2);
          field($$, name, $4);
          field($$, assign_expr, $5);
-		 field($$, type_spec, nil);
+	field($$, type_spec, nil);
       }
    | is_public is_shared "var" IDENTIFIER ':' type_specifier optional_assignment_expression end_token
       {
