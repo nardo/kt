@@ -72,9 +72,9 @@ class node_function (program_node):
 
 		return_stmt_decl = None
 		for arg in self.parameter_list:
-			if arg in self.symbols:
-				raise compile_error, (decl, "Argument " + arg + " is declared more than once.")
-			self.symbols[arg] = ('arg', self.arg_count)
+			if arg.name in self.symbols:
+				raise compile_error, (decl, "Argument " + arg.name + " is declared more than once.")
+			self.symbols[arg.name] = ('arg', self.arg_count)
 			self.arg_count += 1
 			#print "Arg: " + arg
 		if len(self.statements) == 0 or self.statements[-1].__class__ is not node_return_stmt:
@@ -124,5 +124,14 @@ class node_function_expr(node_function):
 		return 'load_sub_function', self.result_register, self.function_index
 
 class node_selector_pair(program_node):
+	pass
+
+class node_parameter(program_node):
+	pass
+
+class node_builtin_function(program_node):
+	pass
+
+class node_builtin_method(program_node):
 	pass
 

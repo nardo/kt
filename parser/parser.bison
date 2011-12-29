@@ -204,10 +204,23 @@ optional_parameter_list
 	;
 
 parameter_list
-	: IDENTIFIER
-	   { $$ = list($1); }
-	| parameter_list ',' IDENTIFIER
-		{ $$ = $1; append($1, $3); }
+	: IDENTIFIER optional_type_specifier
+	{
+		YYSTYPE pair;
+		pair = node(parameter);
+		field(pair, name, $1);
+		field(pair, type_spec, $2);
+		$$ = list(pair);		
+	}
+	| parameter_list ',' IDENTIFIER optional_type_specifier
+	{
+		YYSTYPE pair;
+		pair = node(parameter);
+		field(pair, name, $3);
+		field(pair, type_spec, $4);
+		$$ = $1;
+		append($1, pair);
+	}
 	;
 
 

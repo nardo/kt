@@ -12,14 +12,7 @@
 #include "Python.h"
 #include <objc/runtime.h>
 #include <Foundation/NSBundle.h>
-
-
-#include "core/platform.h"
-namespace core
-{
-#include "core/core.h"
-};
-
+#include "standard_library.h"
 
 void objc_test()
 {
@@ -128,8 +121,142 @@ static PyObject *kt_objc_test_py(PyObject *self, PyObject *args)
 	return 0;
 }
 
+core::kt_program the_program;
+
+static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
+{
+	const char *script_data;
+	PyObject *script_object_class;
+	if(!PyArg_ParseTuple(args, "O", &script_object_class))
+		return NULL;
+	parse_result result;
+	parse_node_ptr builtins_node = result.add_node("object");
+	builtins_node->set_property(&result, "parent_decl", result.add_list(result.add_c_string("directory")));
+	builtins_node->set_property(&result, "is_public", result.add_int(0));
+	builtins_node->set_property(&result, "name", result.add_c_string("builtins"));
+	builtins_node->set_property(&result, "parameter_list", NULL);
+	builtins_node->set_property(&result, "facet_list", NULL);
+	parse_node_ptr body = result.add_list(NULL);
+	builtins_node->set_property(&result, "body", body);
+	
+	core::dictionary<core::type_database::type_rep *>::pointer p = the_program._type_database._class_table.first();
+	while(p)
+	{
+		core::type_database::type_rep *val = *(p.value());
+		if(val->kind == core::type_database::type_basic)
+		{
+			parse_node_ptr type_node = result.add_node("builtin_type");
+			type_node->set_property(&result, "name", result.add_c_string(val->name.c_str()));
+			body->append(type_node);
+		}
+		else
+		{
+			parse_node_ptr compound_node = result.add_node("builtin_class");
+			compound_node->set_property(&result, "name", result.add_c_string(val->name.c_str()));
+			parse_node_ptr compound_body = result.add_list(NULL);
+			if(val->parent_class)
+				compound_node->set_property(&result, "parent_decl", result.add_list(result.add_c_string(val->parent_class->name.c_str())));
+
+			compound_node->set_property(&result, "body", compound_body);
+			for(core::dictionary<core::type_database::field_rep>::pointer fp = val->fields.first(); fp; fp = fp.next())
+			{
+				parse_node_ptr compound_field = result.add_node("builtin_slot");
+				compound_field->set_property(&result, "name", result.add_c_string(fp.value()->name.c_str()));
+				core::type_database::type_rep *field_type = the_program._type_database.find_type(fp.value()->type);
+				if(field_type)
+				{
+					parse_node_ptr type_spec = result.add_node("locator_type_specifier");
+					type_spec->set_property(&result, "locator", result.add_c_string(field_type->name.c_str()));
+					compound_field->set_property(&result, "type_spec", type_spec);
+				}
+				compound_body->append(compound_field);
+			}
+			for(core::hash_table_flat<core::indexed_string, core::function_record *>::pointer mp = val->method_table.first(); mp; ++mp)
+			{
+				const core::indexed_string *name = mp.key();
+				core::function_record *func = *(mp.value());
+				parse_node_ptr method_node = result.add_node("builtin_method");
+				method_node->set_property(&result, "name", result.add_c_string(name->c_str()));
+				parse_node_ptr parameters = result.add_list(NULL);
+				method_node->set_property(&result, "parameter_list", parameters);
+				core::function_type_signature *sig = func->get_signature();
+				for(uint32 i = 0; i < sig->argument_count; i++)
+				{
+					core::type_record *param_type = sig->argument_types[i];
+					core::type_database::type_rep *param_rep = the_program._type_database.find_type(param_type);
+					
+					parse_node_ptr parameter = result.add_node("parameter");
+					parameter->set_property(&result, "name", NULL);
+					if(param_rep)
+					{
+						parse_node_ptr type_spec = result.add_node("locator_type_specifier");
+						type_spec->set_property(&result, "locator", result.add_c_string(param_rep->name.c_str()));
+						parameter->set_property(&result, "type_spec", type_spec);						
+					}
+					else
+						parameter->set_property(&result, "type_spec", NULL);
+					parameters->append(parameter);
+				}
+				core::type_database::type_rep *return_rep = the_program._type_database.find_type(sig->return_type);
+				if(return_rep)
+				{
+					parse_node_ptr type_spec = result.add_node("locator_type_specifier");
+					type_spec->set_property(&result, "locator", result.add_c_string(return_rep->name.c_str()));
+					method_node->set_property(&result, "return_type", result.add_list(type_spec));
+				}
+				else
+					method_node->set_property(&result, "return_type", NULL);
+				compound_body->append(method_node);
+			}
+			body->append(compound_node);
+		}
+		p = p.next();
+	}
+	for(core::hash_table_flat<core::indexed_string, core::function_record *>::pointer fp = the_program._type_database._function_table.first(); fp; ++fp)
+	{
+		const core::indexed_string *name = fp.key();
+		core::function_record *func = *(fp.value());
+		parse_node_ptr function_node = result.add_node("builtin_function");
+		function_node->set_property(&result, "name", result.add_c_string(name->c_str()));
+		parse_node_ptr parameters = result.add_list(NULL);
+		function_node->set_property(&result, "parameter_list", parameters);
+		core::function_type_signature *sig = func->get_signature();
+		for(uint32 i = 0; i < sig->argument_count; i++)
+		{
+			core::type_record *param_type = sig->argument_types[i];
+			core::type_database::type_rep *param_rep = the_program._type_database.find_type(param_type);
+			
+			parse_node_ptr parameter = result.add_node("parameter");
+			parameter->set_property(&result, "name", NULL);
+			if(param_rep)
+			{
+				parse_node_ptr type_spec = result.add_node("locator_type_specifier");
+				type_spec->set_property(&result, "locator", result.add_c_string(param_rep->name.c_str()));
+				parameter->set_property(&result, "type_spec", type_spec);						
+			}
+			else
+				parameter->set_property(&result, "type_spec", NULL);
+			parameters->append(parameter);
+		}
+		core::type_database::type_rep *return_rep = the_program._type_database.find_type(sig->return_type);
+		if(return_rep)
+		{
+			parse_node_ptr type_spec = result.add_node("locator_type_specifier");
+			type_spec->set_property(&result, "locator", result.add_c_string(return_rep->name.c_str()));
+			function_node->set_property(&result, "return_type", result.add_list(type_spec));
+		}
+		else
+			function_node->set_property(&result, "return_type", NULL);
+		body->append(function_node);
+	}
+	PyObject *return_tree = kt_build_pyobject_tree(builtins_node, script_object_class);
+	Py_INCREF(return_tree);
+	return return_tree;
+}
+
 static PyMethodDef kt_Methods[] = {
     {"parse",  kt_parse_py, METH_VARARGS, "Parse a single kt script."},
+    {"query_builtins",  kt_query_builtins, METH_VARARGS, "Returns a python object tree of builtin objects."},
 	{"objc_test", kt_objc_test_py, METH_VARARGS, "Test some objective C action!."},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
@@ -138,7 +265,7 @@ int main (int argc, char *  argv[])
 {
 	 /* Pass argv[0] to the Python interpreter */
     Py_SetProgramName(argv[0]);
-
+	
     /* Initialize the Python interpreter.  Required. */
     Py_Initialize();
     Py_InitModule("kt", kt_Methods);

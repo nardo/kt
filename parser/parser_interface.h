@@ -106,6 +106,12 @@ struct parse_result
 		ret->string_data[string_len] = 0;
 		return ret;
 	}
+	
+	parse_node *add_c_string(const char *string)
+	{
+		uint string_len = strlen(string);
+		return add_string(string, string_len);
+	}
 
 	void dump_as_text()
 	{

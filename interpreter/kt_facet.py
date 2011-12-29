@@ -4,8 +4,8 @@ from kt_program_tree import *
 #from kt_builtin_functions import *
 #from kt_builtin_classes import *
 #from kt_program_declarations import *
-from kt_builtin_functions import *
-from kt_builtin_classes import *
+import kt
+from kt_file_tree import ast_node
 
 # returns the number of elements that are the same in two lists starting from
 # the beginning of the list
@@ -39,12 +39,6 @@ class node_basic_type (type_specifier):
 		self.type_id = type_id
 		self.type = kt_type.kind.basic_type
 
-def add_basic_types(the_facet):
-	the_facet.variable_type_id = the_facet.add_basic_type("variable")
-	the_facet.integer_type_id = the_facet.add_basic_type("integer")
-	the_facet.float_type_id = the_facet.add_basic_type("float")
-	the_facet.string_type_id = the_facet.add_basic_type("string")
-
 # a facet in kt defines a full program execution space.
 class facet:
 	def __init__(self, facet_name):
@@ -64,12 +58,14 @@ class facet:
 		self.root.name = 'Root'
 		self.add_global(self.root)
 
-		add_builtin_functions(self)
-		add_builtin_classes(self)
-		add_basic_types(self)
-
 	def process(self, file_tree):
+		self.root.body = [kt.query_builtins(ast_node)]
 		build_facet_program_tree(self, file_tree)
+		builtins_node = self.root.contents['builtins']
+		for node in builtins_node.contents.values():
+			if not node.is_container():
+				self.add_global(node)
+
 		print "Globals: " + str(" ".join(g.name for g in self.globals_list))
 
 		print "Analyzing Containers"

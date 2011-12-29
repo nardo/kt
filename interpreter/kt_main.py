@@ -8,11 +8,15 @@ from kt_file_tree import *
 from kt_codegen import *
 from kt_program_tree import *
 from kt_facet import *
-
+import kt
 import sys
 import traceback
 
 def test():
+	#builtins_tree = kt.query_builtins(ast_node)
+	#print str(builtins_tree)
+	#print dump_ast(builtins_tree, 0)
+	#return
 	build_node_lookup_table()
 	root_tree = sys.argv[1]
 	#try:

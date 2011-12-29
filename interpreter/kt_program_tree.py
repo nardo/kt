@@ -13,7 +13,6 @@ def compiler_warning(node_where, warning_string):
 
 class program_node:
 	def __init__(self):
-		self.program_facet = None
 		self.container = None
 	def is_container(self):
 		return False
@@ -21,6 +20,11 @@ class program_node:
 		return False
 	def is_function(self):
 		return False
+	def get_ancestry_list(self):
+		if self.container is None:
+			return [self]
+		else:
+			return self.container.get_ancestry_list() + [self]
 
 class type_specifier(program_node):
 	class kind:
@@ -35,12 +39,10 @@ class type_specifier(program_node):
 		map_type = 7
 	def type_kind(self):
 		return invalid_type
-
 	pass
 
-class node_python_function (program_node):
-	def __init__(self, the_python_function):
-		self.python_function = the_python_function
+class node_builtin_type(type_specifier):
+	pass
 
 def analyze_block(func, statement_list):
 	for stmt in statement_list:
@@ -91,7 +93,10 @@ def dump_program_tree(node, level = 0, visited = {}):
 		# "}\n"
 	elif issubclass(node.__class__, program_node):
 		if node in visited:
-			return "\n" + " " * (level * 2) + str(node.__class__)
+			if 'name' in node.__dict__:
+				return "\n" + " " * (level * 2) + "'" + node.name + "'"
+			else:
+				return "\n" + " " * (level * 2) + str(node.__class__)
 		visited[node] = True
 		return "\n" + " " * (level * 2) + str(node.__class__) +\
 		       "".join ( "\n" + " " * (level * 2 + 2) + str (field_name) + " = " +
@@ -229,7 +234,7 @@ def build_facet_program_tree(the_facet, file_tree):
 						facet_node.contents[new_node.name] = new_node
 						print "|  " * indent_level + new_node.name + ":"
 						build_tree_recurse_decl(new_node, sub_decl, indent_level + 1)
-						if new_node.is_compound():
+						if new_node.is_container():
 							the_facet.add_global(new_node)
 			else:
 				print "|  " * indent_level + field + " = "

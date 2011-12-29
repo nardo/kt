@@ -22,6 +22,7 @@ class slot:
 
 class container_node (program_node):
 	def __init__(self):
+		program_node.__init__(self)
 		self.contents = {}
 		self.assignments = []
 		self.constructor_index = None
@@ -181,10 +182,11 @@ class node_object (container_node):
 class node_class (container_node):
 	pass
 
-class node_python_class (container_node):
-	def __init__(self, the_python_class):
-		container_node.__init__(self)
-		self.python_class = the_python_class
+class node_builtin_class (container_node):
+	pass
+
+class node_builtin_slot (program_node):
+	pass
 
 class node_record (container_node):
 	pass
