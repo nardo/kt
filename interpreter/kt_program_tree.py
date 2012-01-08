@@ -26,24 +26,6 @@ class program_node:
 		else:
 			return self.container.get_ancestry_list() + [self]
 
-class type_specifier(program_node):
-	class kind:
-		invalid_type = -1
-		basic_type = 0
-		reference_type = 1
-		object_type = 2
-		class_type = 3
-		record_type = 4
-		function_type = 5
-		array_type = 6
-		map_type = 7
-	def type_kind(self):
-		return invalid_type
-	pass
-
-class node_builtin_type(type_specifier):
-	pass
-
 def analyze_block(func, statement_list):
 	for stmt in statement_list:
 		stmt.analyze(func)
@@ -52,10 +34,11 @@ def compile_block(func, statement_list, continue_ip, break_ip):
 	for stmt in statement_list:
 		stmt.compile(func, continue_ip, break_ip)
 
-from kt_program_declarations import *
-from kt_program_function_decl import *
-from kt_program_statements import *
-from kt_program_expressions import *
+from kt_types import *
+from kt_declarations import *
+from kt_functions import *
+from kt_statements import *
+from kt_expressions import *
 
 ast_node_lookup_table = {}
 

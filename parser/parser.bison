@@ -578,7 +578,7 @@ function_declaration_statement
          $$ = node(function_declaration_stmt);
          field($$, name, $2);
          field($$, parameter_list, $4);
-         field($$, return_type, $6);
+         field($$, return_type_list, $6);
          field($$, statements, $8);
       }
 

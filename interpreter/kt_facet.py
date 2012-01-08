@@ -78,11 +78,12 @@ class facet:
 
 		# output the compiled code
 		emit_string = self.emit_standard_includes() +\
+					"namespace core {\n"+\
 					self.emit_string_table() +\
 					"struct program {\n" +\
 					self.emit_classdefs() +\
 					self.emit_functions() +\
-					"};\n"
+					"};\n}\n"
 		print "Facet compiles to:\n"
 		print emit_string
 
@@ -99,8 +100,13 @@ class facet:
 
 	def emit_classdefs(self):
 		result = ""
+		builtins_node = self.find_node(None, "/builtins")
+		print "found builtins_node: " + str(builtins_node)
+
+		# output a classdef for each container that is not a builtin
 		for c in self.sorted_containers:
-			result += c.emit_classdef()
+			if c.container != builtins_node:
+				result += c.emit_classdef()
 		return result
 
 	def emit_functions(self):
@@ -110,14 +116,8 @@ class facet:
 		#	func.compile_function()
 
 	def add_function(self, the_function):
-		func_index = len(self.functions)
 		self.functions.append(the_function)
-		the_function.function_index = func_index
 		the_function.facet = self
-		return func_index
-
-	def get_function_by_index(self, index):
-		return self.functions[index]
 
 	# add_type takes a parsed type_spec and returns an integer type id
 	# type_spec => [locator, is_array, is_reference, size_expr]
@@ -183,13 +183,17 @@ class facet:
 
 	def find_node(self, search_node, parent_name, filter_func = lambda x: True ):
 		parent_part = parent_name.partition('/')
-		if not self.globals.has_key(parent_part[0]):
+		if len(parent_part[0]) > 0 and not self.globals.has_key(parent_part[0]):
 			print "Error, node named " + parent_part[0] + " is not in facet " + self.facet_name
 			return None
 		else:
+			if len(parent_part[0]) == 0:
+				search_list = [self.root]
+			else:
+				search_list = self.globals[parent_part[0]]
 			node_list = []
 			# construct a list of nodes that can be reached from the specified parent_name path
-			for node in self.globals[parent_part[0]]:
+			for node in search_list:
 				remainder_path = parent_part[2]
 				leaf_node = node
 				while remainder_path != "":

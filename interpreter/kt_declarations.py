@@ -6,19 +6,19 @@ class slot:
 	variable_slot = 0
 	function_slot = 1
 
-	def __init__(self, initial_node, type, name, index, global_function_index=0,type_spec=None):
+	def __init__(self, initial_node, type, name, index, type_spec = None, function_decl = None):
 		self.name = name
 		self.type = type
 		self.index = index
 		self.initial_node = initial_node
-		self.global_function_index = global_function_index
+		self.function_decl = function_decl
 		self.type_spec = type_spec
 	def is_variable(self):
 		return self.type == slot.variable_slot
 	def is_function(self):
 		return self.type == slot.function_slot
 	def __str__(self):
-		return "(" + str(self.type) + " " + self.name + ": " + str((self.index, self.global_function_index, self.type_spec)) + ")"
+		return "(" + str(self.type) + " " + self.name + ": " + str((self.index, self.function_decl, self.type_spec)) + ")"
 
 class container_node (program_node):
 	def __init__(self):
@@ -37,11 +37,24 @@ class container_node (program_node):
 	def is_container(self):
 		return True
 
+	def get_c_classname(self):
+		container_list = self.get_ancestry_list();
+		return "_".join(x.name for x in container_list)
+
 	def emit_classdef(self):
-		emit_string = "struct " + self.get_c_classname() + "{\n"
-		for member in self.members:
+		parent_string = " : " + self.parent_node.get_c_classname() if self.parent_node is not None else ""
+		emit_string = "struct " + self.get_c_classname() + parent_string + " {\n"
+		for member in self.members.values():
 			if member.initial_node == self:
-				emit_string += member.type_decl.get_c_type_string() + " " + member.name
+				if member.type == slot.variable_slot:
+					emit_string += member.type_decl.get_c_type_string() + " " + member.name + ";\n"
+				elif member.type == slot.function_slot:
+					emit_string += member.function_decl.emit_function()
+		if self.constructor_decl is not None:
+			emit_string += self.constructor_decl.emit_function()
+
+		emit_string += "};\n"
+		return emit_string
 
 	def set_member_info_from(self, parent):
 		self.members = parent.members
@@ -81,22 +94,20 @@ class container_node (program_node):
 			#todo: check that the parent_func is not actually declared in this node (multiple definition)
 			if parent_func.type != 'function':
 				raise compile_error, (function_node, "Function " + name + " of " + function_node.name + " is already declared as a nonfunction")
-			vtable_index = parent_func.index
+			vtable_index = parent_func.vtable_index
 			parent_func.has_override = True
 		else:
 			parent_func = None
 			vtable_index = self.vtable_count
 			self.vtable_count += 1
-		if function_node.index is not None:
-			function_index = func_node.index
-		else:
-			function_index = the_facet.add_function(function_node)
-
-		self.members[function_node.name] = slot(initial_node = self, type=slot.function_slot, name=function_node.name,index=vtable_index,global_function_index=function_index)
+		self.members[function_node.name] = slot(initial_node = self, type=slot.function_slot,
+		                                        name=function_node.name,index=vtable_index,
+		                                        function_decl=function_node)
 		if vtable_index == len(self.vtable):
 			self.vtable.append(function_node)
 		else:
 			self.vtable[vtable_index] = function_node
+		the_facet.add_function(function_node)
 
 	def add_constructor_assignment(self, slot_index, assignment_expression):
 		self.assignments.append((slot_index, assignment_expression))
@@ -119,7 +130,10 @@ class container_node (program_node):
 				assign_stmt.slot = e[0]
 				assign_stmt.value = e[1]
 			constructor_decl.parameter_list = node.parameter_list if 'parameter_list' in self.__dict__ else []
-			self.constructor_index = the_facet.add_function(constructor_decl)
+			self.constructor_decl = constructor_decl
+			the_facet.add_function(constructor_decl)
+		else:
+			self.constructor_decl = None
 
 	def analyze_container(self, the_facet):
 		if self.process_pass == 1:
@@ -183,7 +197,8 @@ class node_class (container_node):
 	pass
 
 class node_builtin_class (container_node):
-	pass
+	def get_c_classname(self):
+		return self.name
 
 class node_builtin_slot (program_node):
 	pass
@@ -205,18 +220,6 @@ class node_variable (program_node):
 		return True
 
 class node_transmission_specifier (program_node):
-	pass
-
-class node_type(program_node):
-	pass
-
-class node_locator_type_specifier(type_specifier):
-	pass
-
-class node_reference_type_specifier(type_specifier):
-	pass
-
-class node_array_type_specifier(type_specifier):
 	pass
 
 class node_slot_assignment(program_node):

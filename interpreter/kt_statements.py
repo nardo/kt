@@ -1,5 +1,5 @@
 from kt_program_tree import *
-from kt_program_expressions import *
+from kt_expressions import *
 
 class node_variable_declaration_stmt(program_node):
 	def analyze(self, func):
@@ -39,9 +39,17 @@ class node_break_stmt(program_node):
 
 class node_return_stmt(program_node):
 	def analyze(self, func):
-		# todo: typecheck the return expressions against the function signature
-		for expr in self.return_expression_list:
-			expr.analyze(func, ('any'))
+		if func.return_type_list is None:
+			func.return_type_list = [node_locator_type_specifier() for x in self.return_expression_list]
+			for type_spec in func.return_type_list:
+				type_spec.locator = 'variable'
+				type_spec.analyze(func)
+		if len(func.return_type_list) != len(self.return_expression_list):
+			raise compile_error, (self, "all return points from a function must return the same number of arguments " \
+			                            "and must match the number of return types if specified in the function " \
+			                            "declaration.")
+		for expr, type in zip(self.return_expression_list, func.return_type_list):
+			expr.analyze(func, type)
 			func.returns_value = True
 		func.ip += 1
 	def compile(self, func, continue_ip, break_ip):

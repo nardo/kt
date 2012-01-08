@@ -4,6 +4,7 @@ from kt_program_statements import node_return_stmt
 class node_function (program_node):
 	def __init__(self):
 		program_node.__init__(self)
+		self.return_type_list = None
 		self.analyzed = False
 		self.function_expr_count = 0
 		self.loop_count = 0
@@ -25,9 +26,9 @@ class node_function (program_node):
 		self.returns_value = False
 		self.facet = None
 		self.has_override = False
-		self.parent_function_index = None
+		self.parent_function = None
 		self.is_class_function = False
-		self.index = None
+		self.vtable_index = None
 
 	def is_function(self):
 		return True
@@ -46,8 +47,8 @@ class node_function (program_node):
 		self.register_count += 1
 		return register_index
 
-	def set_parent_function_index(self, parent_index):
-		self.parent_function_index = parent_index
+	def emit_function(self):
+		pass
 
 	def __str__(self):
 		ret = "Arg Count " + str(self.arg_count) + " Local Count " + str(self.local_variable_count) + " Register Count " + str(self.register_count) + "\n"
@@ -64,10 +65,6 @@ class node_function (program_node):
 		if self.analyzed:
 			return
 		self.analyzed = True
-		if self.parent_function_index is not None:
-			parent_func_record = the_facet.get_function_by_index(self.parent_function_index)
-		else:
-			parent_func_record = None
 		print str(self)
 
 		return_stmt_decl = None
@@ -81,6 +78,10 @@ class node_function (program_node):
 			return_stmt_decl = node_return_stmt()
 			return_stmt_decl.return_expression_list = []
 			self.statements.append(return_stmt_decl)
+		if self.return_type_list is not None:
+			# analyze every type specifier in the return type list:
+			for type_spec in self.return_type_list:
+				type_spec.analyze(self)
 		analyze_block(self, self.statements)
 		print self.name + " - analysis complete"
 
@@ -99,8 +100,8 @@ class node_function_declaration_stmt(node_function):
 
 		func.facet.add_function(self)
 		self.prev_scope = func
-		func.symbols[func_name] = ('sub_function', self.function_index)
-		func.child_functions.append(self.function_index)
+		func.symbols[func_name] = ('sub_function', self)
+		func.child_functions.append(self)
 	def compile(self, func, continue_ip, break_ip):
 		pass
 
@@ -114,14 +115,14 @@ class node_function_expr(node_function):
 		self.prev_scope = func
 		func.facet.add_function(self)
 
-		func.symbols[self.name] = ('sub_function', self.function_index)
-		func.child_functions.append(self.function_index)
+		func.symbols[self.name] = ('sub_function', self)
+		func.child_functions.append(self)
 
 		self.result_register = si.add_register()
 		return self.result_register
 
 	def compile(self, func, valid_types):
-		return 'load_sub_function', self.result_register, self.function_index
+		return 'load_sub_function', self.result_register, self
 
 class node_selector_pair(program_node):
 	pass

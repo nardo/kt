@@ -3,10 +3,9 @@
 # (C) 2009 Mark Frohnmayer.  The use of this code is governed by its license.  See /License/info.txt in the source distribution for the full license agreement.
 
 #from kt_compiler import *
-from kt_vm import *
 from kt_file_tree import *
-from kt_codegen import *
 from kt_program_tree import *
+from kt_types import *
 from kt_facet import *
 import kt
 import sys

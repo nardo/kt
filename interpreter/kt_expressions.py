@@ -146,7 +146,7 @@ class node_slot_expr(node_expression):
 			slot = parent_record.members[expr.slot_name]
 			if slot.type != 'function':
 				raise compile_error, (self, "parent expression must reference a function.")
-			self.parent_function_index = slot.global_function_index
+			self.parent_function = slot.function_decl
 		else:
 			self.object_expr.analyze(func, ('any'))
 	def analyze_lvalue(self, func, valid_types):
@@ -154,8 +154,8 @@ class node_slot_expr(node_expression):
 			raise compile_error, (self, "Parent call slot reference cannot be used as an l-value")
 		self.object_expr.analyze(si, ('any'))
 	def compile(self, func, expr, valid_types):
-		if 'parent_function_index' in self.__dict__:
-			return ('selfmethod_global', self.parent_function_index)
+		if 'parent_function' in self.__dict__:
+			return ('selfmethod_global', self.parent_function)
 		else:
 			return ('slot', self.object.expr.compile(func, ('any')), self.slot_name)
 
