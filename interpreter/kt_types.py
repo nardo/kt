@@ -18,6 +18,10 @@ class type_specifier(program_node):
 		return invalid_type
 	def analyze(self, func):
 		pass
+	def emit_declaration(self, var_name_str):
+		return "variable " + var_name_str
+	def get_c_typename(self):
+		return "variable"
 
 class node_locator_type_specifier(type_specifier):
 	pass

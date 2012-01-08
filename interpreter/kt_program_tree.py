@@ -11,8 +11,9 @@ class compile_error:
 def compiler_warning(node_where, warning_string):
 	print "Warning!: " + warning_string
 
-class program_node:
+class program_node(object):
 	def __init__(self):
+		object.__init__(self)
 		self.container = None
 	def is_container(self):
 		return False

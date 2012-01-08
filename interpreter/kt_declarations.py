@@ -1,5 +1,5 @@
 from kt_program_tree import *
-from kt_program_function_decl import node_function
+from kt_functions import node_function
 #from kt_facet import *
 
 class slot:
@@ -45,6 +45,7 @@ class container_node (program_node):
 		parent_string = " : " + self.parent_node.get_c_classname() if self.parent_node is not None else ""
 		emit_string = "struct " + self.get_c_classname() + parent_string + " {\n"
 		for member in self.members.values():
+			print(member.name)
 			if member.initial_node == self:
 				if member.type == slot.variable_slot:
 					emit_string += member.type_decl.get_c_type_string() + " " + member.name + ";\n"
@@ -165,9 +166,11 @@ class container_node (program_node):
 				
 			# first add any new functions and variable declarations
 			for element in self.contents.values():
+				print " -- member " + element.name + " " + str(element.__class__)
 				if element.__class__ == node_variable:
 					self.add_member_variable(element)
 				elif element.__class__ == node_function:
+					print " -- got function " + element.name + " " + str(element.__class__)
 					self.add_member_function(element, the_facet)
 
 			# if is is a compound with a body, check for slot assignments

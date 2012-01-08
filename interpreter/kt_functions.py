@@ -1,5 +1,5 @@
 from kt_program_tree import *
-from kt_program_statements import node_return_stmt
+from kt_statements import node_return_stmt
 
 class node_function (program_node):
 	def __init__(self):
@@ -48,7 +48,25 @@ class node_function (program_node):
 		return register_index
 
 	def emit_function(self):
-		pass
+		# first, if the function has more than one return value, create a struct
+		# to pass results back.
+		emit_string = ""
+		if self.return_type_list is not None and len(self.return_type_list) > 0:
+			if len(self.return_type_list) > 1:
+				self.return_struct_name = "__rv_" + self.name
+				emit_string += "struct " + self.return_struct_name + " {\n"
+				rval_index = 0
+				for type in self.return_type_list:
+					emit_string += type.emit_declaration("rv_" + str(rval_index)) + ";\n"
+				emit_string += "};\n"
+				return_type_name = self.return_struct_name
+			else:
+				return_type_name = self.return_type_list[0].get_c_typename()
+		else:
+			return_type_name = "void"
+		emit_string += return_type_name + " " + self.name + "(" + ", ".join(arg.type_spec.emit_declaration(arg.name) for arg in self.parameter_list) + ")\n{"
+		emit_string += "}\n"
+		return emit_string
 
 	def __str__(self):
 		ret = "Arg Count " + str(self.arg_count) + " Local Count " + str(self.local_variable_count) + " Register Count " + str(self.register_count) + "\n"
@@ -66,12 +84,14 @@ class node_function (program_node):
 			return
 		self.analyzed = True
 		print str(self)
-
 		return_stmt_decl = None
 		for arg in self.parameter_list:
 			if arg.name in self.symbols:
 				raise compile_error, (decl, "Argument " + arg.name + " is declared more than once.")
 			self.symbols[arg.name] = ('arg', self.arg_count)
+			if arg.type_spec == None:
+				arg.type_spec = node_locator_type_specifier()
+				arg.type_spec.locator = "variable"
 			self.arg_count += 1
 			#print "Arg: " + arg
 		if len(self.statements) == 0 or self.statements[-1].__class__ is not node_return_stmt:
