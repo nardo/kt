@@ -14,26 +14,70 @@ def compiler_warning(node_where, warning_string):
 class program_node(object):
 	def __init__(self):
 		object.__init__(self)
-		self.container = None
-	def is_container(self):
+		self.compound = None
+	def is_compound(self):
 		return False
 	def is_variable(self):
 		return False
 	def is_function(self):
 		return False
-	def get_ancestry_list(self):
-		if self.container is None:
+	def get_compound_list(self):
+		if self.compound is None:
 			return [self]
 		else:
-			return self.container.get_ancestry_list() + [self]
+			return self.compound.get_compound_list() + [self]
 
-def analyze_block(func, statement_list):
-	for stmt in statement_list:
-		stmt.analyze(func)
+	def dump_tree(self):
+		def dump_node(node, level, visited_set):
+			if node in visited_set:
+				if 'name' in node.__dict__:
+					return "\n" + " " * (level * 2) + "'" + node.name + "'"
+				else:
+					return "\n" + " " * (level * 2) + str(node.__class__)
+			visited_set.add(node)
+			return "\n" + " " * (level * 2) + str(node.__class__) + "".join ( "\n" + " " * (level * 2 + 2) + str (field_name) + " = " + dump_element(node.__dict__[field_name], level + 1, visited_set) for field_name in node.__dict__.keys() )
+		def dump_element(node, level, visited_set):
+			if node is None:
+				return "<null>"
+			elif node.__class__ == list:
+				return "( " + ", ".join( (dump_element(x, level + 1, visited_set) for x in node) ) + " )"
+			elif node.__class__ == dict:
+				return "{" + "".join("\n" + " " * (level * 2 + 2) + str (key) + dump_element(value, level + 2, visited_set) for key, value in node.iteritems())+ "\n" + " " * (level * 2) + "}"
+			elif issubclass(node.__class__, program_node):
+				return dump_node(node, level, visited_set)
+			elif node.__class__ == str:
+				return "\"" + node + "\""
+			else:
+				return str(node)
+		dump_node(self, 0, set())
 
-def compile_block(func, statement_list, continue_ip, break_ip):
-	for stmt in statement_list:
-		stmt.compile(func, continue_ip, break_ip)
+
+def find_in_tree(start, filter_func):
+	def find_in_node(node, filter_func, visited_set):
+		if node not in visited_set:
+			visited_set.add(node)
+			for field_value in node.__dict__.values():
+				for element in find_in_element(field_value, filter_func, visited_set):
+					yield element
+	def find_in_element(element, filter_func, visited_set):
+		if element is not None:
+			if element.__class__ == list:
+				for entry in element:
+					for found_item in find_in_element(entry, filter_func, visited_set):
+						yield found_item
+			elif element.__class__ == dict:
+				for entry in element.values():
+					for found_item in find_in_element(entry, filter_func, visited_set):
+						yield found_item
+			elif issubclass(element.__class__, program_node):
+				if element not in visited_set:
+					visited_set.add(element)
+					if filter_func(element):
+						yield element
+					for found_item in find_in_node(element, filter_func, visited_set):
+						yield found_item
+	for result in find_in_element(start, filter_func, set()):
+		yield result
 
 from kt_types import *
 from kt_declarations import *
@@ -56,40 +100,6 @@ def construct_node(node_name):
 	return ast_node_lookup_table[node_name]()
 
 from kt_file_tree import ast_node
-
-def dump_program_tree(node, level = 0, visited = {}):
-	if node is None:
-		return "<null>"
-	elif node.__class__ == list:
-		return "( " + ", ".join( (dump_program_tree(x, level + 1, visited) for x in node) ) + " )"
-	elif node.__class__ == dict:
-		print node.__class__
-		#print "\n".join( "key: " + str(key) + " value: " + str(value) for key, value in node.iteritems())
-		return "{" + "".join("\n" + " " * (level * 2 + 2) + str (key) + dump_program_tree(value, level + 2,
-		                                                                                visited) for key,
-		                                                                                                      value
-		in node.iteritems())+ "\n" + " " * (level * 2) + "}"
-		#+ \
-		#       " - " + str(value.__class__) + "".join ( "\n" + " " * (level * 2 + 2) +
-		#		str(field_name) + " = " + dump_program_tree(field_value.__dict__[field_name],
-		#        level + 2) for field_name, field_value in value.__dict__.iteritems()) for key,
-		#                                                                                value in node.iteritems()) +
-		# "}\n"
-	elif issubclass(node.__class__, program_node):
-		if node in visited:
-			if 'name' in node.__dict__:
-				return "\n" + " " * (level * 2) + "'" + node.name + "'"
-			else:
-				return "\n" + " " * (level * 2) + str(node.__class__)
-		visited[node] = True
-		return "\n" + " " * (level * 2) + str(node.__class__) +\
-		       "".join ( "\n" + " " * (level * 2 + 2) + str (field_name) + " = " +
-		                 dump_program_tree(node.__dict__[field_name], level + 1, visited)
-				for field_name in node.__dict__.keys() )
-	elif node.__class__ == str:
-		return "\"" + node + "\""
-	else:
-		return str(node)
 
 def build_facet_program_tree(the_facet, file_tree):
 	def decl_in_facet(decl):
@@ -137,7 +147,7 @@ def build_facet_program_tree(the_facet, file_tree):
 			decl.name = file.name
 			decl.parent_decl = [parent]
 			decl.body = []
-			decl.container = facet_node
+			decl.compound = facet_node
 			decl.file_node = file
 			facet_node.contents[file.name] = decl
 
@@ -161,7 +171,7 @@ def build_facet_program_tree(the_facet, file_tree):
 			else:
 				new_node = construct_node(decl.type)
 				new_node.name = decl.name;
-				new_node.container = facet_node
+				new_node.compound = facet_node
 				new_node.syntax_tree = decl
 				facet_node.contents[decl.name] = new_node
 
@@ -214,11 +224,11 @@ def build_facet_program_tree(the_facet, file_tree):
 						# create the new node:
 						new_node = construct_node(sub_decl.type)
 						new_node.name = sub_decl.name
-						new_node.container = facet_node
+						new_node.compound = facet_node
 						facet_node.contents[new_node.name] = new_node
 						print "|  " * indent_level + new_node.name + ":"
 						build_tree_recurse_decl(new_node, sub_decl, indent_level + 1)
-						if new_node.is_container():
+						if new_node.is_compound():
 							the_facet.add_global(new_node)
 			else:
 				print "|  " * indent_level + field + " = "
@@ -226,6 +236,6 @@ def build_facet_program_tree(the_facet, file_tree):
 
 	build_tree_recurse(the_facet.root, file_tree, 0)
 	print("Dumping program tree:")
-	print(dump_program_tree(the_facet.root, 0))
+	print(the_facet.root.dump_tree())
 	print("-- Done")
 

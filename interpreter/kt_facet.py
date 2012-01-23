@@ -45,7 +45,7 @@ class facet:
 		self.string_constants = []
 		self.string_constant_lookup = {}
 		self.facet_name = facet_name
-		self.sorted_containers = []
+		self.sorted_compounds = []
 		self.globals = {}
 		self.globals_list = []
 		self.functions = []
@@ -53,6 +53,13 @@ class facet:
 		self.next_label_id = 1
 		self.next_type_id = 0
 		self.type_list = []
+
+		self.builtin_type_spec_none = node_locator_type_specifier("/builtins/empty_type")
+		self.builtin_type_spec_boolean = node_locator_type_specifier("/builtins/boolean")
+		self.builtin_type_spec_integer = node_locator_type_specifier("/builtins/integer")
+		self.builtin_type_spec_float = node_locator_type_specifier("/builtins/float")
+		self.builtin_type_spec_string = node_locator_type_specifier("/builtins/string")
+		self.builtin_type_spec_variable = node_locator_type_specifier("/builtins/variable")
 
 		self.root = construct_node('object')
 		self.root.name = 'Root'
@@ -63,14 +70,14 @@ class facet:
 		build_facet_program_tree(self, file_tree)
 		builtins_node = self.root.contents['builtins']
 		for node in builtins_node.contents.values():
-			if not node.is_container():
+			if not node.is_compound():
 				self.add_global(node)
 
 		print "Globals: " + str(" ".join(g.name for g in self.globals_list))
 
-		print "Analyzing Containers"
-		for c in (x for x in self.globals_list if x.is_container()):
-			c.analyze_container(self)
+		print "Analyzing compounds"
+		for c in (x for x in self.globals_list if x.is_compound()):
+			c.analyze_compound(self)
 
 		print "Analyzing Functions"
 		for func in self.functions:
@@ -91,11 +98,11 @@ class facet:
 		return "#include \"standard_library.h\"\n"
 
 	def emit_string_table(self):
-		emit_string = "kt_string_constant __string_constants[" + str(len(self.string_constants)) + "] = {\n"
+		emit_string = "string __string_constants[" + str(len(self.string_constants)) + "];\nstatic void __init_string_constants(void)\n{\n"
 		for const_index in range(len(self.string_constants)):
 			const_str = self.string_constants[const_index]
-			emit_string += "{ " + str(len(const_str)) + ", \"" + const_str + "\"},\n"
-		emit_string += "};\n"
+			emit_string += "__string_constants[" + const_index + "] = \""" + const_str + "\";\n"
+		emit_string += "}\n"
 		return emit_string
 
 	def emit_classdefs(self):
@@ -103,9 +110,9 @@ class facet:
 		builtins_node = self.find_node(None, "/builtins")
 		print "found builtins_node: " + str(builtins_node)
 
-		# output a classdef for each container that is not a builtin
-		for c in self.sorted_containers:
-			if c.container != builtins_node:
+		# output a classdef for each compound that is not a builtin
+		for c in self.sorted_compounds:
+			if c.compound != builtins_node:
 				result += c.emit_classdef()
 		return result
 
@@ -165,13 +172,13 @@ class facet:
 				new_node.body = []
 				new_node.parent_decl = ['directory' ]
 				node.contents[path[0]] = new_node
-				new_node.container = node
+				new_node.compound = node
 				node = new_node
 			path = path[2].partition('/')
 		if node.contents.has_key(path[0]):
 			raise compile_error, (None, "duplicate addition of builtin node: " + path[0])
 		the_node.name = path[0]
-		the_node.container = node
+		the_node.compound = node
 		node.contents[path[0]] = the_node
 		self.add_global(the_node)
 

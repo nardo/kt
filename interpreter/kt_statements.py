@@ -1,8 +1,15 @@
 from kt_program_tree import *
 from kt_expressions import *
+from kt_types import *
 
+def goto_label(label_id):
+	return "goto @l" + str(label_id) + ";\n"
+def label(label_id):
+	return "@l" + str(label_id) + ":\n"
 class node_variable_declaration_stmt(program_node):
 	def analyze(self, func):
+		if self.type_spec is None:
+			self.type_spec = node_locator_type_specifier("variable")
 		func.add_local_variable(self, self.name, self.type_spec)
 		# if the statement has an assignment expression, generate an assignment statement for the assignment
 		if self.assign_expr is not None:
@@ -13,96 +20,71 @@ class node_variable_declaration_stmt(program_node):
 			self.assign_stmt.expr.right = self.assign_expr
 			#print "  Adding assignment statement: " + str(assign_stmt)
 			self.assign_stmt.analyze(func)
-	def compile(self, func, continue_ip, break_ip):
-		if self.assign_expr is not None:
-			self.assign_stmt.compile(func, continue_ip, break_ip)
-
+	def compile(self, func, continue_label_id, break_label_id):
+		if self.assign_stmt is not None:
+			func.append_code(self.type_spec.emit_declaration(self.name) + ";\n")
+			self.assign_stmt.compile(func, continue_label_id, break_label_id)
 class node_continue_stmt(program_node):
 	def analyze(self, func):
 		if func.loop_count == 0:
 			raise compile_error, (self, "continue not allowed outside of a loop.")
-		func.ip += 1
-	def compile(self, func, continue_ip, break_ip):
-		func.compiled_statements.append(('branch_always', continue_ip))
-		func.add_branch_target(continue_ip)
-
-
+	def compile(self, func, continue_label_id, break_label_id):
+		func.append_code(goto_label(continue_label_id))
 class node_break_stmt(program_node):
 	def analyze(self, func):
 		if func.loop_count == 0 and func.switch_count == 0:
 			raise compile_error, (self, "break not allowed outside of a loop or switch.")
-		func.ip += 1
-	def compile(self, func, continue_ip, break_ip):
-		func.compiled_statements.append(('branch_always', break_ip))
-		func.add_branch_target(break_ip)
-
-
+	def compile(self, func, continue_label_id, break_label_id):
+		func.append_code(goto_label(break_label_id))
 class node_return_stmt(program_node):
 	def analyze(self, func):
-		if func.return_type_list is None:
-			func.return_type_list = [node_locator_type_specifier() for x in self.return_expression_list]
-			for type_spec in func.return_type_list:
-				type_spec.locator = 'variable'
-				type_spec.analyze(func)
-		if len(func.return_type_list) != len(self.return_expression_list):
-			raise compile_error, (self, "all return points from a function must return the same number of arguments " \
-			                            "and must match the number of return types if specified in the function " \
-			                            "declaration.")
+		if len(self.return_expression_list) != len(func.return_type_list):
+			raise compile_error, (self, "Returned element count does not match prior return statements and/or the function signature.")
 		for expr, type in zip(self.return_expression_list, func.return_type_list):
 			expr.analyze(func, type)
-			func.returns_value = True
-		func.ip += 1
-	def compile(self, func, continue_ip, break_ip):
-		func.compiled_statements.append(('return', [x.compile(func, ('any')) for x in self.return_expression_list]))
+	def compile(self, func, continue_label_id, break_label_id):
+		return_count = len(self.return_expression_list)
+		if return_count == 0:
+			func.append_code("return;\n")
+		elif return_count == 1:
+			#in this case, let the expression return the symbol for the returned value
+			returned_symbol = self.return_expression_list[0].compile(func, None, func.return_type_list[0])
+			func.append_code("return " + returned_symbol + ";\n")
+		else:
+			for index, pair in enumerate(zip(self.return_expression_list, func.return_type_list)):
+				pair[0].compile(func, "__rv.rv_" + str(index), pair[1])
+				func.append_code("return __rv;\n")
 
 class node_switch_stmt(program_node):
 	def analyze(self, func):
 		# save the expression result in a register
-
-		self.expr_register = func.add_register()
+		self.test_expression_type = self.test_expression.get_preferred_type()
 		func.switch_count += 1
-		# the basic form of the switch statement is to evaluate
-		# the switch expression into the temporary register (first instruction)
-		# then for each switch element there is either a branch test for the cases
-		# followed by a branch always to the default case or out of the switch if there's
-		# no default.
-		func.ip += 2 + len(self.element_list)
-		self.test_expression.analyze(func, ('any'))
+		# the basic form of the switch statement is to evaluate the switch expression into the temporary register (first instruction) then for each switch element there is either a branch test for the cases followed by a branch always to the default case or out of the switch if there's no default.
+		self.test_expression.analyze(func, self.test_expression_type)
 		for element in self.element_list:
 			for label in element.label_list:
-				label.test_constant.analyze(func, ('any'))
-			analyze_block(func, element.statement_list)
+				label.test_constant.analyze(func, self.test_expression_type)
+			func.analyze_block(element.statement_list)
 		if self.default_block is not None:
-			self.default_block.analyze(func)
-		self.break_ip = func.ip
+			func.analyze_block(default_block)
 		func.switch_count -= 1
 
-	def compile(self, func, continue_ip, break_ip):
-		switch_start = len(func.statements)
-		test_register = self.expr_register
-		func.compiled_statements.append( ('eval', ('assign', ('local', test_register), self.test_expression.compile(func, ('any')))))
-		# reserve cascading statement list for the test expressions and final branch
-		func.compiled_statements = func.compiled_statements + [None] * (len(self.element_list) + 1)
-		index = 1
-
-		def build_compare(expr):
-			return ('bool_binary', 'compare_equal', ('local', test_register ), expr.compile(func, ('any')))
-
+	def compile(self, func, continue_label_id, break_label_id):
+		test_register = func.alloc_register(self.test_expression_type)
+		self.test_expression.compile(func, test_register, self.test_expression_type)
+		self.end_label_id = func.get_next_label_id()
 		for element in self.element_list:
-			ip = len(func.compiled_statements)
-			compile_block(func, element.statement_list, continue_ip, self.break_ip)
-			label_list = element.label_list
-			compare_expr = build_compare(label_list[0].test_constant)
-			for label in label_list[1:]:
-				compare_expr = ('bool_binary', 'logical_or', compare_expr, build_compare(label.test_constant))
-			func.compiled_statements[switch_start + index] = ('branch_if_nonzero', ip, compare_expr)
-			func.add_branch_target(ip)
-			index += 1
-		switch_end = len(func.compiled_statements)
-		func.compiled_statements[switch_start + index] = ('branch_always', switch_end)
-		func.add_branch_target(switch_end)
+			element.label_id = func.get_next_label_id()
+			for label in label_list:
+				comparator = label.test_constant.compile(func, None, self.test_expression_type)
+				func.append_code("if(" + test_register + " == " + comparator + ") " + goto_label(element.label_id) + ";\n")
 		if self.default_block is not None:
-			compile_block(func, self.default_block, continue_ip, self.break_ip)
+			func.compile_block(default_block, continue_label_id, self.end_label_id)
+			func.append_code(goto_label(self.end_label_id))
+		for element in self.element_list:
+			func.append_code(label(element.label_id))
+			func.compile_block(element.statement_list, continue_label_id, self.end_label_id)
 
 class node_switch_element(program_node):
 	pass
@@ -112,54 +94,54 @@ class node_switch_label(program_node):
 
 class node_if_stmt(program_node):
 	def analyze(self, func):
-		self.test_expression.analyze(func, ('bool'))
-		func.ip += 1
+		self.test_expression.analyze(func, func.facet.builtin_type_spec_boolean)
 		analyze_block(func, self.if_block)
 		if 'else_block' in self.__dict__:
-			func.ip += 1
-			self.if_false_jump = func.ip
 			analyze_block(func.ip, stmt.else_block)
-			self.if_true_jump = func.ip
+
+	def compile(self, func, continue_label_id, break_label_id):
+		else_block_label_id = func.get_next_label_id()
+		symbol = self.test_expression.compile(None, func.facet.builtin_type_spec_boolean)
+		func.append_code("if(!" + symbol + ") " + goto_label(else_block_label_id))
+		func.compile_block(self.if_block, continue_label_id, break_label_id)
+		if('else_block' in self.__dict__):
+			end_if_label_id = func.get_next_label_id()
+			func.append_code(goto_label(end_if_label_id) + label(else_block_label_id))
+			func.compile_block(self.else_block, continue_label_id, break_label_id)
+			func.append_code(label(end_if_label_id))
 		else:
-			self.if_false_jump = func.ip
-	def compile(self, func, continue_ip, break_ip):
-		func.compiled_statements.append(('branch_if_zero', self.if_false_jump, compile_boolean_expression(func, self.test_expression)))
-		func.add_branch_target(self.if_false_jump)
-		compile_block(func, self.if_block, continue_ip, break_ip)
-		if 'else_block' in self.__dict__:
-			func.compiled_statements.append(('branch_always', self.if_true_jump))
-			func.add_branch_target(self.if_true_jump)
-			compile_block(func, self.else_block, continue_ip, break_ip)
+			func.append_code(label(else_block_label_id))
 
 class node_while_stmt(program_node):
 	def analyze(self, func):
 		func.loop_count += 1
-		self.test_expression.analyze(func, ('bool'))
-		self.continue_ip = func.ip
-		func.ip += 1
-		analyze_block(func, self.statement_list)
-		func.ip += 1
-		self.break_ip = func.ip
+		self.test_expression.analyze(func, func.facet.builtin_type_spec_boolean)
+		func.analyze_block(self.statement_list)
 		func.loop_count -= 1
-	def compile(self, func, continue_ip, break_ip):
-		func.compiled_statements.append(('branch_if_zero', self.break_ip, compile_boolean_expression(func, self.test_expression)))
-		func.add_branch_target(self.break_ip)
-		compile_block(func, self.statement_list, self.continue_ip, self.break_ip)
+	def compile(self, func, continue_label_id, break_label_id):
+		continue_label_id = func.get_next_label_id()
+		break_label_id = func.get_next_label_id()
+		func.append_code(label(continue_label_id))
+		test_symbol = self.test_expression.compile(func, None, func.facet.builtin_type_spec_boolean)
+		func.append_code("if(!" + test_symbol + ") " + goto_label(break_label_id))
+		func.compile_block(self.statement_list, continue_label_id, break_label_id)
+		func.append_code(label(break_label_id))
 
 class node_do_while_stmt(program_node):
 	def analyze(self, func):
 		func.loop_count += 1
-		self.start_ip = func.ip
 		analyze_block(func, self.statement_list)
-		self.continue_ip = func.ip
-		func.ip += 1
-		self.break_ip = func.ip
-		self.test_expression.analyze(func, ('bool'))
+		self.test_expression.analyze(func, func.facet.builtin_type_spec_boolean)
 		func.loop_count -= 1
-	def compile(self, func, continue_ip, break_ip):
-		compile_block(func, self.statement_list, self.continue_ip, self.break_ip)
-		func.compiled_statements.append(('branch_if_nonzero', self.start_ip, compile_boolean_expression(func, self.test_expression)))
-		func.add_branch_target(self.start_ip)
+	def compile(self, func, continue_label_id, break_label_id):
+		start_label_id = func.get_next_label_id()
+		continue_label_id = func.get_next_label_id()
+		break_label_id = func.get_next_label_id()
+		func.append_code(label(start_label_id))
+		func.compile_block(self.statement_list, continue_label_id, break_label_id)
+		func.append_code(label(continue_label_id))
+		test_symbol = self.test_expression.compile(func, None, func.facet.builtin_type_spec_boolean)
+		func.append_code("if(" + test_symbol + ") " + goto_label(start_label_id) + label(break_label_id))
 
 class node_for_stmt(program_node):
 	def analyze(self, func):
@@ -168,50 +150,43 @@ class node_for_stmt(program_node):
 		if 'variable_initializer' in self.__dict__:
 			func.add_local_variable(self, self.variable_initializer, self.variable_type_spec)
 		if 'init_expression' in self.__dict__:
-			self.init_expression.analyze(func, ('any'))
-			func.ip += 1
-		loop_start_ip = func.ip
-		self.test_expression.analyze(func, ('bool'))
-		func.ip += 1
-		analyze_block(func, self.statement_list)
-		if 'end_loop_expression' in self.__dict__ and self.end_loop_expression is not None:
-			self.continue_ip = func.ip
-			self.end_loop_expression.analyze(func, ('any'))
-			func.ip += 2
-		else:
-			self.continue_ip = loop_start_ip
-		self.loop_start_ip = loop_start_ip
-		self.break_ip = func.ip
+			self.init_expression.analyze(func, func.facet.builtin_type_spec_none)
+		self.test_expression.analyze(func, func.facet.builtin_type_spec_boolean)
+		func.analyze_block(self.statement_list)
+		if self.end_loop_expression is not None:
+			self.end_loop_expression.analyze(func, func.facet.builtin_type_spec_none)
 		func.loop_count -= 1
-	def compile(self, func, continue_ip, break_ip):
+	def compile(self, func, continue_label_id, break_label_id):
 		if 'init_expression' in self.__dict__:
-			func.compiled_statements.append(('eval', compile_void_expression(func, self.init_expression)))
-		func.compiled_statements.append(('branch_if_zero', self.break_ip, self.test_expression.compile(func, ('boolean'))))
-		func.add_branch_target(self.break_ip)
-		compile_block(func, self.statement_list, self.continue_ip, self.break_ip)
-		if 'end_loop_expression' in self.__dict__ and self.end_loop_expression is not None:
-			func.compiled_statements.append(('eval', compile_void_expression(func, self.end_loop_expression)))
-		func.compiled_statements.append(('branch_always', self.loop_start_ip))
-		func.add_branch_target(self.loop_start_ip)
+			self.init_expression.compile(func, None, func.facet.builtin_type_spec_none)
+		start_loop_label_id = func.get_next_label_id()
+		break_label_id = func.get_next_label_id()
+		if self.end_loop_expression is not None:
+			continue_label_id = func.get_next_label_id()
+		else:
+			continue_label_id = start_loop_label_id
+		func.append_code(label(start_loop_label_id))
+		test_symbol = self.test_expression.compile(func, None, func.facet.builtin_type_spec_boolean)
+		func.append_code("if(!" + test_symbol + ") " + goto_label(break_label_id))
+		func.compile_block(self.statement_list, continue_label_id, break_label_id)
+		if self.end_loop_expression is not None:
+			func.append_code(label(continue_label_id))
+			self.end_loop_expression.compile(func, None, func.facet.builtin_type_spec_none)
+		func.append_code(goto_label(start_loop_label_id) + label(break_label_id))
 
 class node_expression_stmt(program_node):
 	# expr
 	def analyze(self, func):
-		self.expr.analyze(func, ('any'))
-		func.ip += 1
+		self.expr.analyze(func, func.facet.builtin_type_spec_none)
 
-	def compile(self, func, continue_ip, break_ip):
-		func.compiled_statements.append(('eval', compile_void_expression(func, self.expr)))
+	def compile(self, func, continue_label_id, break_label_id):
+		self.expr.compile(func, None, func.facet.builtin_type_spec_none)
 
 # initializer_stmt's are generated for constructors
 class node_initializer_stmt(program_node):
 	#slot
-	##value
 	def analyze(self, func):
-		self.value.analyze(func, ('any'))
-		func.ip += 1
+		self.slot.assignment.analyze(func, slot.type_spec)
 
-	def compile(self, func, continue_ip, break_ip):
-		func.compiled_statements.append(('eval', ('assign', ('ivar', self.slot),
-									   self.value.compile(func, ('any')) )))
-
+	def compile(self, func, continue_label_id, break_label_id):
+		self.slot.assignment.compile(func, "this->" + self.slot.name, slot.type_spec)

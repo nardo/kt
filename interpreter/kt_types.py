@@ -22,8 +22,20 @@ class type_specifier(program_node):
 		return "variable " + var_name_str
 	def get_c_typename(self):
 		return "variable"
+	def check_conversion(self, type_spec):
+		# raises a compile error if self cannot be converted to the specified type
+	def is_equivalent(self, type_spec):
+		# returns True if the types are fundamentally the same
+		return False
+	def is_numeric(self):
+		return False
+	def is_string(self):
+		return False
 
 class node_locator_type_specifier(type_specifier):
+	def __init__(self, locator = None):
+		type_specifier.__init__(self)
+		self.locator = locator
 	pass
 
 class node_reference_type_specifier(type_specifier):

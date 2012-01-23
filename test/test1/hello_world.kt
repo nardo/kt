@@ -15,6 +15,9 @@ function test_function()
 			break
 	return result
 
+function multi_return_type()
+	return "hello", ", world"
+
 function main()
 	var string = test_function()
 	print(string)

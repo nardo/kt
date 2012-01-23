@@ -12,10 +12,6 @@ import sys
 import traceback
 
 def test():
-	#builtins_tree = kt.query_builtins(ast_node)
-	#print str(builtins_tree)
-	#print dump_ast(builtins_tree, 0)
-	#return
 	build_node_lookup_table()
 	root_tree = sys.argv[1]
 	#try:
@@ -27,13 +23,6 @@ def test():
 		print "Processing facet: " + facet_name
 		new_facet = facet(facet_name)
 		new_facet.process(file_tree)
-
-		# the_vm = vm(new_facet)
-		# the_vm.exec_function("main", ())
-			
-			#the_code_generator = code_generator(new_facet)
-			#the_code_generator.go()
-
 	#except compile_error, err:
 	#	traceback.print_exc()
 	#	print "Compile ERROR DUDE!!: " + err.error_string

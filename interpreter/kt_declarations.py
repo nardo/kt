@@ -1,26 +1,8 @@
 from kt_program_tree import *
 from kt_functions import node_function
-#from kt_facet import *
+from kt_slot import *
 
-class slot:
-	variable_slot = 0
-	function_slot = 1
-
-	def __init__(self, initial_node, type, name, index, type_spec = None, function_decl = None):
-		self.name = name
-		self.type = type
-		self.index = index
-		self.initial_node = initial_node
-		self.function_decl = function_decl
-		self.type_spec = type_spec
-	def is_variable(self):
-		return self.type == slot.variable_slot
-	def is_function(self):
-		return self.type == slot.function_slot
-	def __str__(self):
-		return "(" + str(self.type) + " " + self.name + ": " + str((self.index, self.function_decl, self.type_spec)) + ")"
-
-class container_node (program_node):
+class compound_node (program_node):
 	def __init__(self):
 		program_node.__init__(self)
 		self.contents = {}
@@ -34,12 +16,15 @@ class container_node (program_node):
 		self.vtable_count = 0
 		self.process_pass = 0
 		
-	def is_container(self):
+	def is_compound(self):
 		return True
 
 	def get_c_classname(self):
-		container_list = self.get_ancestry_list();
-		return "_".join(x.name for x in container_list)
+		compound_list = self.get_compound_list();
+		return "_".join(x.name for x in compound_list)
+
+	def get_c_name(self):
+		compound_list = self.get_compound_list()
 
 	def emit_classdef(self):
 		parent_string = " : " + self.parent_node.get_c_classname() if self.parent_node is not None else ""
@@ -50,9 +35,9 @@ class container_node (program_node):
 				if member.type == slot.variable_slot:
 					emit_string += member.type_decl.get_c_type_string() + " " + member.name + ";\n"
 				elif member.type == slot.function_slot:
-					emit_string += member.function_decl.emit_function()
+					emit_string += member.function_decl.compile_function()
 		if self.constructor_decl is not None:
-			emit_string += self.constructor_decl.emit_function()
+			emit_string += self.constructor_decl.compile_function()
 
 		emit_string += "};\n"
 		return emit_string
@@ -84,7 +69,8 @@ class container_node (program_node):
 		self.slot_count += 1
 
 		if element.assign_expr is not None:
-			self.add_constructor_assignment(the_slot.index, element.assign_expr)
+			the_slot.assignment = element.assign_expr
+			self.add_constructor_assignment(the_slot)
 
 	def add_member_function(self, function_node, the_facet):
 		if self.members_origin_node != self:
@@ -101,17 +87,15 @@ class container_node (program_node):
 			parent_func = None
 			vtable_index = self.vtable_count
 			self.vtable_count += 1
-		self.members[function_node.name] = slot(initial_node = self, type=slot.function_slot,
-		                                        name=function_node.name,index=vtable_index,
-		                                        function_decl=function_node)
+		self.members[function_node.name] = slot(initial_node = self, type = slot.function_slot, name = function_node.name, index = vtable_index, function_decl = function_node)
 		if vtable_index == len(self.vtable):
 			self.vtable.append(function_node)
 		else:
 			self.vtable[vtable_index] = function_node
 		the_facet.add_function(function_node)
 
-	def add_constructor_assignment(self, slot_index, assignment_expression):
-		self.assignments.append((slot_index, assignment_expression))
+	def add_constructor_assignment(self, slot):
+		self.assignments.append(slot)
 
 	def build_constructor(self, the_facet):
 		if len(self.assignments):
@@ -128,15 +112,14 @@ class container_node (program_node):
 				constructor_decl.statements.append(parent_stmt)
 			for e in node.assignments:
 				assign_stmt = node_initializer_stmt()
-				assign_stmt.slot = e[0]
-				assign_stmt.value = e[1]
+				assign_stmt.slot = e
 			constructor_decl.parameter_list = node.parameter_list if 'parameter_list' in self.__dict__ else []
 			self.constructor_decl = constructor_decl
 			the_facet.add_function(constructor_decl)
 		else:
 			self.constructor_decl = None
 
-	def analyze_container(self, the_facet):
+	def analyze_compound(self, the_facet):
 		if self.process_pass == 1:
 			raise compile_error, (self, "Error - compound " + self.name + " cannot be its own ancestor")
 		elif self.process_pass == 0:
@@ -152,12 +135,12 @@ class container_node (program_node):
 					raise compile_error, (self, "Could not find parent " + parent + " for compound " + self.name)
 				else:
 					print "processing parent: " + parent_node.name
-					parent_node.analyze_container(the_facet)
+					parent_node.analyze_compound(the_facet)
 				self.parent_node = parent_node
 			else:
 				self.parent_node = None
 			self.process_pass = 2
-			the_facet.sorted_containers.append(self)
+			the_facet.sorted_compounds.append(self)
 			# now that the parent node is processed, we can process this node
 			self.assignments = []
 
@@ -166,11 +149,9 @@ class container_node (program_node):
 				
 			# first add any new functions and variable declarations
 			for element in self.contents.values():
-				print " -- member " + element.name + " " + str(element.__class__)
 				if element.__class__ == node_variable:
 					self.add_member_variable(element)
 				elif element.__class__ == node_function:
-					print " -- got function " + element.name + " " + str(element.__class__)
 					self.add_member_function(element, the_facet)
 
 			# if is is a compound with a body, check for slot assignments
@@ -193,20 +174,20 @@ class container_node (program_node):
 			print "node " + self.name + " processed - booyaka"
 
 
-class node_object (container_node):
+class node_object (compound_node):
 	pass
 
-class node_class (container_node):
+class node_class (compound_node):
 	pass
 
-class node_builtin_class (container_node):
+class node_builtin_class (compound_node):
 	def get_c_classname(self):
 		return self.name
 
 class node_builtin_slot (program_node):
 	pass
 
-class node_record (container_node):
+class node_record (compound_node):
 	pass
 
 class node_facet (node_object):
