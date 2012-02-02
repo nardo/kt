@@ -27,10 +27,24 @@ class type_specifier(program_node):
 	def is_equivalent(self, type_spec):
 		# returns True if the types are fundamentally the same
 		return False
+	def is_callable(self):
+		return False
+	def get_callable_return_type(self):
+		return None
+	def callable_has_signature(self):
+		return False
+	def get_callable_parameter_types(self):
+		return None
 	def is_numeric(self):
 		return False
 	def is_string(self):
 		return False
+	def is_compound(self):
+		return False
+	def is_compound_pointer(self):
+		return False
+	def get_compound_members(self):
+		return None
 
 class node_locator_type_specifier(type_specifier):
 	def __init__(self, locator = None):

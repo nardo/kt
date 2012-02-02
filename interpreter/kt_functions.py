@@ -5,7 +5,7 @@ from kt_slot import *
 class function_base (program_node):
 	def __init__(self):
 		program_node.__init__(self)
-		self.return_type_list = None
+		self.return_type = None
 		self.arg_count = 0
 
 	def is_function(self):
@@ -43,7 +43,10 @@ class node_function (function_base):
 		self.parent_function = None
 		self.is_class_function = False
 		self.vtable_index = None
-		self.return_struct_name = None
+		self.return_type = None
+
+	def get_type_signature(self):
+		return None
 
 	def get_c_name(self):
 		if self.prev_scope is None:
@@ -124,16 +127,6 @@ class node_function (function_base):
 			return_stmt_decl.return_expression_list = []
 			self.statements.append(return_stmt_decl)
 
-		if self.return_type_list is None:
-			# if the return_type_list is not specified, derive it from the first return statement in the function.  All return statements will be checked against this type signature list during analysis
-			first_return_stmt = find_in_tree(self.statements, lambda y: y.__class__ == node_return_stmt).next()
-			print "   function returns " + str(len(first_return_stmt.return_expression_list)) + " values"
-			self.return_type_list = [node_locator_type_specifier("variable") for x in xrange(len(first_return_stmt.return_expression_list))]
-
-		# analyze every type specifier in the return type list:
-		for type_spec in self.return_type_list:
-			type_spec.analyze(self)
-
 		self.analyze_block(self.statements)
 		print self.name + " - analysis complete"
 
@@ -144,24 +137,13 @@ class node_function (function_base):
 	def append_code(self, the_string):
 		self.code += the_string
 	def append_type_conversion(self, source_symbol, source_type, destination_symbol, destination_type):
-		pass
+		# TODO: put in actual type conversion code
+		self.append_code(destination_symbol + " = " + source_symbol + ";\n")
 
 	def compile_function(self):
 		self.code = ""
-		# first, if the function has more than one return value, create a struct to pass results back.
-		if self.return_type_list is not None and len(self.return_type_list) > 0:
-			if len(self.return_type_list) > 1:
-				self.return_struct_name = "__rv_" + self.name
-				append_code( "struct " + self.return_struct_name + " {\n" + ";\n".join( type_spec.emit_declaration("rv_" + str(index)) for index, type_spec in enumerate(self.return_type_list) ) + ";\n};\n")
-				return_type_name = self.return_struct_name
-			else:
-				return_type_name = self.return_type_list[0].get_c_typename()
-		else:
-			return_type_name = "void"
+		return_type_name = self.return_type.get_c_typename()
 		append_code(return_type_name + " " + self.name + "(" + ", ".join(arg.type_spec.emit_declaration(arg.name) for arg in self.parameter_list) + ")\n{\n")
-		if self.return_struct_name is not None:
-			# this function returns its result through a struct
-			append_code(self.return_struct_name + " __rv;")
 		self.compile_block(self.statements, 0, 0)
 		append_code("}\n")
 

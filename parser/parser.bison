@@ -585,22 +585,8 @@ function_declaration_statement
 optional_return_type
    :
       { $$ = nil; }
-   | "->" return_type_declaration
+   | "->" type_specifier
       { $$ = $2; }
-   ;
-
-return_type_declaration
-   : type_specifier
-      { $$ = list($1); }
-   | '(' type_specifier_list ')'
-      { $$ = $2; }
-   ;
-
-type_specifier_list
-   : type_specifier
-      { $$ = list($1); }
-   | type_specifier_list ',' type_specifier
-      { $$ = $1; append($1, $3); }
    ;
 	
 /*---------------------------------------------------------------------
@@ -648,10 +634,10 @@ statement
 			$$ = node(return_stmt);
 			field($$, return_expression_list, empty_list());
 		}
-	| "return" expression_list end_token
+	| "return" expression end_token
 		{
 			$$ = node(return_stmt);
-			field($$, return_expression_list, $2);
+			field($$, return_expression, $2);
 		}
 	| expression_statement end_token
 		{ $$ = $1; }

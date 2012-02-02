@@ -2,10 +2,6 @@ from kt_program_tree import *
 from kt_expressions import *
 from kt_types import *
 
-def goto_label(label_id):
-	return "goto @l" + str(label_id) + ";\n"
-def label(label_id):
-	return "@l" + str(label_id) + ":\n"
 class node_variable_declaration_stmt(program_node):
 	def analyze(self, func):
 		if self.type_spec is None:
@@ -38,22 +34,27 @@ class node_break_stmt(program_node):
 		func.append_code(goto_label(break_label_id))
 class node_return_stmt(program_node):
 	def analyze(self, func):
-		if len(self.return_expression_list) != len(func.return_type_list):
-			raise compile_error, (self, "Returned element count does not match prior return statements and/or the function signature.")
-		for expr, type in zip(self.return_expression_list, func.return_type_list):
-			expr.analyze(func, type)
+		if func.return_type is None:
+			# if there is a return expression the return type is variable - else the return type is empty_type.
+			if self.return_expression:
+				func.return_type = func.facet.builtin_type_spec_variable
+			else:
+				func.return_type = func.facet.builtin_type_spec_none
+
+		if func.return_type == func.facet.builtin_type_spec_none and self.return_expression is not None:
+			raise compile_error, (self, "Function returning none cannot return a value")
+		if func.return_type != func.facet.builtin_type_spec_none and self.return_expression is None:
+			raise compile_error, (self, "Function should return a value here")
+
+		if self.return_expression is not None:
+			self.return_expression.analyze(func, func.return_type)
+
 	def compile(self, func, continue_label_id, break_label_id):
-		return_count = len(self.return_expression_list)
-		if return_count == 0:
+		if self.return_expression is None:
 			func.append_code("return;\n")
-		elif return_count == 1:
-			#in this case, let the expression return the symbol for the returned value
-			returned_symbol = self.return_expression_list[0].compile(func, None, func.return_type_list[0])
-			func.append_code("return " + returned_symbol + ";\n")
-		else:
-			for index, pair in enumerate(zip(self.return_expression_list, func.return_type_list)):
-				pair[0].compile(func, "__rv.rv_" + str(index), pair[1])
-				func.append_code("return __rv;\n")
+
+		returned_symbol = self.return_expression.compile(func, None, func.return_type)
+		func.append_code("return " + returned_symbol + ";\n")
 
 class node_switch_stmt(program_node):
 	def analyze(self, func):
