@@ -7,7 +7,7 @@ class compound_node (program_node):
 		program_node.__init__(self)
 		self.contents = {}
 		self.assignments = []
-		self.constructor_index = None
+		self.constructor_decl = None
 		self.members = {} # members holds all the slots for a compound
 		self.vtable = [] # vtable is a fast method lookup table.  Each method slot is assigned a vtable entry for
 		# fast method dispatch
@@ -100,14 +100,14 @@ class compound_node (program_node):
 	def build_constructor(self, the_facet):
 		if len(self.assignments):
 			constructor_decl = node_function()
-			constructor_decl.name = '__constructor'
+			constructor_decl.name = '__construct__' + self.name
 			constructor_decl.statements = []
 			parent = self.parent_node
-			if parent is not None and parent.constructor_index is not None:
+			if parent is not None and parent.constructor_decl is not None:
 				parent_stmt = node_expression_stmt()
 				parent_stmt.expr = node_func_call_expr()
-				parent_stmt.expr.func_expr = node_selfmethod_global_expr()
-				parent_stmt.expr.func_expr.func_index = parent.constructor_index
+				parent_stmt.expr.func_expr = node_locator_expr()
+				parent_stmt.expr.func_expr.string = parent.constructor_decl.name
 				parent_stmt.expr.args = node.parent_decl[1]
 				constructor_decl.statements.append(parent_stmt)
 			for e in node.assignments:

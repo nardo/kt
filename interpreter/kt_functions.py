@@ -100,12 +100,6 @@ class node_function (function_base):
 		self.append_code(register_type_spec.emit_declaration(register_symbol) + ";\n")
 		return register_symbol
 
-		register_index = registers_by_type_id[type_id].in_use
-		if registers_by_type_id[type_id].in_use < registers_by
-		register_index = self.register_count
-		self.register_count += 1
-		return register_index
-
 	def analyze_function(self, the_facet):
 		if self.analyzed:
 			return

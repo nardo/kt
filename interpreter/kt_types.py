@@ -16,7 +16,7 @@ class type_specifier(program_node):
 		map_type = 7
 	def type_kind(self):
 		return invalid_type
-	def analyze(self, func):
+	def resolve(self, func):
 		pass
 	def emit_declaration(self, var_name_str):
 		return "variable " + var_name_str
@@ -24,6 +24,7 @@ class type_specifier(program_node):
 		return "variable"
 	def check_conversion(self, type_spec):
 		# raises a compile error if self cannot be converted to the specified type
+		return None
 	def is_equivalent(self, type_spec):
 		# returns True if the types are fundamentally the same
 		return False
@@ -45,6 +46,17 @@ class type_specifier(program_node):
 		return False
 	def get_compound_members(self):
 		return None
+	def is_container(self):
+		return False
+	def is_container_sequential(self):
+		return False
+	def get_container_size(self):
+		return "Variable"
+	def get_container_key_type(self):
+		return None
+	def get_container_value_type(self):
+		return None
+
 
 class node_locator_type_specifier(type_specifier):
 	def __init__(self, locator = None):

@@ -101,7 +101,7 @@ class facet:
 		emit_string = "string __string_constants[" + str(len(self.string_constants)) + "];\nstatic void __init_string_constants(void)\n{\n"
 		for const_index in range(len(self.string_constants)):
 			const_str = self.string_constants[const_index]
-			emit_string += "__string_constants[" + const_index + "] = \""" + const_str + "\";\n"
+			emit_string += "__string_constants[" + const_index + "] = \"" + const_str + "\";\n"
 		emit_string += "}\n"
 		return emit_string
 

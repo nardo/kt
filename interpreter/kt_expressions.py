@@ -1,4 +1,5 @@
 from kt_program_tree import *
+from kt_slot import *
 
 def compile_boolean_expression(func, expr):
 	return expr.compile(func, ('boolean'))
@@ -23,20 +24,6 @@ class node_expression(program_node):
 
 class node_locator_expr(node_expression):
 
-	# different types of locators.  The first set (up to last_lvalue_type) can be lvalues in expressions
-	unknown_type = 0
-	local_variable_type = 1
-	prev_scope_variable_type = 2
-	instance_variable_type = 3
-	global_variable_type = 4
-	last_lvalue_type = 4 #------------
-	method_type = 5
-	reference_type = 6
-	global_function_type = 7
-	child_function_type = 8
-	prev_scope_child_function_type = 9
-	builtin_class_type = 10
-	builtin_function_type = 11
 
 	def __init__(self):
 		node_expression.__init__(self)
@@ -49,54 +36,7 @@ class node_locator_expr(node_expression):
 		if self.resolved:
 			return
 		self.resolved = True
-		locator_name = self.string
-		if locator_name in func.symbols:
-			self.slot = func.symbols[locator_name]
-			if self.slot.type == slot.variable_slot:
-				self.locator_type = node_locator_expr.local_variable_type
-				self.c_name = locator_name
-			else:
-				self.locator_type = node_locator_expr.child_function_type
-				self.c_name = self.slot.function_decl.get_c_name()
-		elif func.prev_scope and locator_name in func.prev_scope.symbols:
-			self.slot = func.prev_scope.symbols[locator_name]
-			if self.slot.type == slot.variable_slot:
-				self.c_name = "__prev_scope__->" + locator_name
-				self.locator_type = node_locator_expr.prev_scope_variable_type
-				func.needs_prev_scope = True
-				func.prev_scope.scope_needed = True
-			else:
-				self.c_name = self.slot.function_decl.get_c_name()
-				self.locator_type = node_locator_expr.prev_scope_child_function_type
-		elif func.compound and locator_name in func.compound.members:
-			self.slot = func.compound.members[locator_name]
-			if self.slot.is_variable():
-				self.c_name = "__self_object__->" + locator_name
-				self.locator_type = node_locator_expr.instance_variable_type
-			elif self.slot.is_function():
-				self.locator_type = node_locator_expr.method_type
-				self.c_name = self.slot.function_decl.get_c_name()
-			else:
-				raise compile_error, (self, "member " + locator_name + " cannot be used here.")
-		else:
-			# search the global compound
-			node = func.facet.find_node(func.compound, locator_name)
-			if not node:
-				raise compile_error, (self, "locator " + locator_name + " not found.")
-			if node.is_compound():
-				self.slot = slot(node, slot.reference_slot, locator_name, 0)
-				self.locator_type = node_locator_expr.reference_type
-				self.c_name = node.get_c_name()
-			elif node.__class__ == node_variable:
-				self.slot = slot(node, slot.variable_slot, locator_name, 0, node.type_spec)
-				self.locator_type = node_locator_expr.global_variable_type
-				self.c_name = node.get_c_name() + "." + locator_name
-			elif node.__class__ == node_function:
-				self.slot = slot(node, slot.function_slot, locator_name, 0, function_decl = node)
-				self.locator_type = node_locator_expr.global_function_type
-				self.c_name = node.get_c_name()
-			else:
-				raise compile_error, (self, "global node " + locator_name + " cannot be used as a locator.")
+		self.slot, self.foo, self.bar = resolve_locator(func, self.string)
 
 	def get_preferred_type_spec(self, func):
 		self.resolve(func)
@@ -653,7 +593,8 @@ class node_assign_expr(node_expression):
 		return self.left.get_preferred_type_spec(func)
 	def analyze(self, func, type_spec):
 		self.left.analyze_lvalue(func, type_spec)
-		self.right.analyze(func, self.left.get_preferred_type_spec(func))
+		left_type_spec = self.left.get_preferred_type_spec(func)
+		self.right.analyze(func, left_type_spec)
 	def compile(self, func, return_symbol, type_spec):
 		lvalue_symbol, lvalue_type = self.left.compile_lvalue(func)
 		if return_symbol is None:
@@ -666,47 +607,119 @@ class node_assign_expr(node_expression):
 			func.append_type_conversion(lvalue_symbol, lvalue_type, return_symbol, type_spec)
 
 class node_float_assign_expr(node_expression):
+	def get_preferred_type_spec(self, func):
+		return self.left.get_preferred_type_spec(func)
 	# left, right, op
-	def analyze(self, func, valid_types):
-		self.left.analyze_lvalue(func, ('number'))
-		self.right.analyze(func, ('number'))
-	def compile(self, func, valid_types):
-		return ('float_assign', self.op, self.left.compile(func, ('number')), self.right.compile(func, ('number')))
+	def analyze(self, func, type_spec):
+		self.left.analyze_lvalue(func, func.facet.builtin_type_spec_float)
+		self.right.analyze(func, func.facet.builtin_type_spec_float)
+		func.facet.builtin_type_spec_float.check_conversion(type_spec)
+	def compile(self, func, return_symbol, type_spec):
+		if return_symbol is None:
+			return_symbol = func.add_register(type_spec)
+		lvalue_symbol, lvalue_type = self.left.compile_lvalue(func)
+		operand_symbol = self.right.compile(func, None, func.facet.builtin_type_spec_float)
+		op_string = " " + node_float_binary_expr.op_table[self.op][1] + "= "
+		if lvalue_type.is_equivalent(func.facet.builtin_type_spec_float):
+			func.append_code(lvalue_symbol + " " + op_string + operand_symbol + ";\n")
+			result_register = lvalue_symbol
+		else:
+			result_register = func.add_register(func.facet.builtin_type_spec_float)
+			func.append_type_conversion(lvalue_symbol, lvalue_type, result_register, func.facet.builtin_type_spec_float)
+			func.append_code(result_register + op_string + operand_symbol + ";\n")
+			func.append_type_conversion(result_register, func.facet.builtin_type_spec_float, lvalue_symbol, lvalue_type)
+		if type_spec.is_equivalent(func.facet.builtin_type_spec_float):
+			func.append_code(return_symbol + " = " + result_register + ";\n")
+		else:
+			func.append_type_conversion(result_register, func.facet.builtin_type_spec_float, return_symbol, type_spec)
+		return return_symbol
 
 class node_int_assign_expr(node_expression):
+	def get_preferred_type_spec(self, func):
+		return self.left.get_preferred_type_spec(func)
 	# left, right, op
-	def analyze(self, func, valid_types):
-		self.left.analyze_lvalue(func, ('integer'))
-		self.right.analyze(func, ('integer'))
-	def compile(self, func, valid_types):
-		return ('int_assign', expr.op, self.left.compile(func, ('integer')), self.right.compile(func, ('integer')))
+	def analyze(self, func, type_spec):
+		self.left.analyze_lvalue(func, func.facet.builtin_type_spec_integer)
+		self.right.analyze(func, func.facet.builtin_type_spec_integer)
+		func.facet.builtin_type_spec_integer.check_conversion(type_spec)
+	def compile(self, func, return_symbol, type_spec):
+		if return_symbol is None:
+			return_symbol = func.add_register(type_spec)
+		lvalue_symbol, lvalue_type = self.left.compile_lvalue(func)
+		operand_symbol = self.right.compile(func, None, func.facet.builtin_type_spec_integer)
+		op_string = " " + node_int_binary_expr.op_table[self.op][1] + "= "
+		if lvalue_type.is_equivalent(func.facet.builtin_type_spec_integer):
+			func.append_code(lvalue_symbol + " " + op_string + operand_symbol + ";\n")
+			result_register = lvalue_symbol
+		else:
+			result_register = func.add_register(func.facet.builtin_type_spec_integer)
+			func.append_type_conversion(lvalue_symbol, lvalue_type, result_register, func.facet.builtin_type_spec_integer)
+			func.append_code(result_register + op_string + operand_symbol + ";\n")
+			func.append_type_conversion(result_register, func.facet.builtin_type_spec_integer, lvalue_symbol, lvalue_type)
+		if type_spec.is_equivalent(func.facet.builtin_type_spec_integer):
+			func.append_code(return_symbol + " = " + result_register + ";\n")
+		else:
+			func.append_type_conversion(result_register, func.facet.builtin_type_spec_integer, return_symbol, type_spec)
+		return return_symbol
 
 class node_array_expr(node_expression):
-	# array_values (list)
-	def analyze(self, func, valid_types):
+	def get_preferred_type_spec(self, func):
+		return func.facet.builtin_type_spec_variable
+	def analyze(self, func, type_spec):
+		if not type_spec.is_container():
+			raise compile_error, (self, "object is not a container.")
+		if not type_spec.is_container_sequential():
+			raise compile_error, (self, "array can only be assigned to sequentially accessable containers (arrays).")
+		container_size = type_spec.get_container_size()
+		if container_size != "variable":
+			if len(self.array_values) != container_size:
+				raise compile_error, (self, "expecting " + container_size + " array value initializers; got " + len(self.array_values))
+		value_type = type_spec.get_container_value_type()
 		for sub_expr in self.array_values:
-			sub_expr.analyze(func, ('any'))
-	def compile(self, func, valid_types):
-		return ('array', [sub_expr.compile(func, ('any')) for sub_expr in self.array_values])
+			sub_expr.analyze(func, value_type)
+	def compile(self, func, return_symbol, type_spec):
+		# if this is a variable type_spec, create a new array
+		if return_symbol is None:
+			return_symbol = func.add_register(type_spec)
+		if type_spec.is_equivalent(func.facet.builtin_type_spec_variable):
+			func.append_code(return_symbol + " = new array<variable>;")
+		if type_spec.get_container_size() == "variable":
+			func.append_code("set_array_size(" + return_symbol + ", " + str(len(self.array_values)))
+		value_type = type_spec.get_container_value_type()
+		for index, value in enumerate(self.array_values):
+			value.compile(func, return_symbol + "[" + str(index) + "]", type_spec)
 
 class node_map_expr(node_expression):
-	# map_pairs (list)
-	def analyze(self, func, valid_types):
+	def get_preferred_type_spec(self, func):
+		return func.facet.builtin_type_spec_variable
+	def analyze(self, func, type_spec):
+		if not type_spec.is_container():
+			raise compile_error, (self, "object is not a container.")
+		container_size = type_spec.get_container_size()
+		if container_size != "variable":
+			raise compile_error, (self, "maps cannot be assigned to fixed arrays")
+		key_type = type_spec.get_container_key_type()
+		value_type = type_spec.get_container_value_type()
 		for pair in self.map_pairs:
-			pair.key.analyze(func, ('any'))
-			pair.value.analyze(func, ('any'))
+			pair.key.analyze(func, key_type)
+			pair.value.analyze(func, value_type)
+	def compile(self, func, return_symbol, type_spec):
+		# if this is a variable type_spec, create a new array
+		if return_symbol is None:
+			return_symbol = func.add_register(type_spec)
+		if type_spec.is_equivalent(func.facet.builtin_type_spec_variable):
+			func.append_code(return_symbol + " = new array<variable>;\n")
+		else:
+			func.append_code(return_symbol + ".clear();\n")
+		func.append_code(return_symbol + "reserve(" + str(len(self.map_pairs)) + ");\n")
 
-	def map_expr_compile_(self, func, valid_types):
-		return ('map', [(pair.key.compile(func, ('any'), False), pair.value.compile(func, ('any'), False)) for pair in self.map_pairs])
+		key_type = type_spec.get_container_key_type()
+		value_type = type_spec.get_container_value_type()
+
+		for pair in self.map_pairs:
+			key_symbol = pair.key.compile(func, None, key_type)
+			pair.value.compile(func, return_symbol + "[" + key_symbol + "]", value_type)
 
 class node_map_pair(program_node):
 	# key, value
 	pass
-
-class selfmethod_global_expr(node_expression):
-	# selfmethod_global evaluates to a declared global function, known to be a method callable
-	# by the current self object.  This is used both for parent class constructor invocation
-	# as well as [TBI] the special "super" object locator
-	def compile(self, func, valid_types):
-		return 'selfmethod_global', self.func_index
-

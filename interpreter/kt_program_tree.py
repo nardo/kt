@@ -90,6 +90,7 @@ from kt_declarations import *
 from kt_functions import *
 from kt_statements import *
 from kt_expressions import *
+from kt_slot import *
 
 ast_node_lookup_table = {}
 
@@ -245,3 +246,67 @@ def build_facet_program_tree(the_facet, file_tree):
 	print(the_facet.root.dump_tree())
 	print("-- Done")
 
+class locator_types:
+	# different types of locators.  The first set (up to last_lvalue_type) can be lvalues in expressions
+	unknown_type = 0
+	local_variable_type = 1
+	prev_scope_variable_type = 2
+	instance_variable_type = 3
+	global_variable_type = 4
+	last_lvalue_type = 4 #------------
+	method_type = 5
+	reference_type = 6
+	global_function_type = 7
+	child_function_type = 8
+	prev_scope_child_function_type = 9
+	builtin_class_type = 10
+	builtin_function_type = 11
+
+def resolve_locator(func_scope, locator_name):
+	if locator_name in func_scope.symbols:
+		locator_slot = func_scope.symbols[locator_name]
+		if locator_slot.type == slot.variable_slot:
+			locator_type = locator_types.local_variable_type
+			c_name = locator_name
+		else:
+			locator_type = locator_types.child_function_type
+			c_name = locator_slot.function_decl.get_c_name()
+	elif func_scope.prev_scope and locator_name in func_scope.prev_scope.symbols:
+		locator_slot = func_scope.prev_scope.symbols[locator_name]
+		if locator_slot.type == slot.variable_slot:
+			c_name = "__prev_scope__->" + locator_name
+			locator_type = locator_types.prev_scope_variable_type
+			func_scope.needs_prev_scope = True
+			func_scope.prev_scope.scope_needed = True
+		else:
+			c_name = locator_slot.function_decl.get_c_name()
+			locator_type = locator_types.prev_scope_child_function_type
+	elif func_scope.compound and locator_name in func_scope.compound.members:
+		locator_slot = func_scope.compound.members[locator_name]
+		if locator_slot.is_variable():
+			c_name = "__self_object__->" + locator_name
+			locator_type = locator_types.instance_variable_type
+		elif locator_slot.is_function():
+			locator_type = locator_types.method_type
+			c_name = self.slot.function_decl.get_c_name()
+		else:
+			raise compile_error, (self, "member " + locator_name + " cannot be used here.")
+	else:
+		# search the global compound
+		node = func.facet.find_node(func.compound, locator_name)
+		if not node:
+			raise compile_error, (self, "locator " + locator_name + " not found.")
+		if node.is_compound():
+			self.slot = slot(node, slot.reference_slot, locator_name, 0)
+			self.locator_type = locator_types.reference_type
+			self.c_name = node.get_c_name()
+		elif node.__class__ == node_variable:
+			self.slot = slot(node, slot.variable_slot, locator_name, 0, node.type_spec)
+			self.locator_type = locator_types.global_variable_type
+			self.c_name = node.get_c_name() + "." + locator_name
+		elif node.__class__ == node_function:
+			self.slot = slot(node, slot.function_slot, locator_name, 0, function_decl = node)
+			self.locator_type = locator_types.global_function_type
+			self.c_name = node.get_c_name()
+		else:
+			raise compile_error, (self, "global node " + locator_name + " cannot be used as a locator.")
