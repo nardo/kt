@@ -185,7 +185,7 @@ static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
 					core::type_record *param_type = sig->argument_types[i];
 					core::type_database::type_rep *param_rep = the_program._type_database.find_type(param_type);
 					
-					parse_node_ptr parameter = result.add_node("parameter");
+					parse_node_ptr parameter = result.add_node("variable");
 					parameter->set_property(&result, "name", NULL);
 					if(param_rep)
 					{
@@ -226,7 +226,7 @@ static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
 			core::type_record *param_type = sig->argument_types[i];
 			core::type_database::type_rep *param_rep = the_program._type_database.find_type(param_type);
 			
-			parse_node_ptr parameter = result.add_node("parameter");
+			parse_node_ptr parameter = result.add_node("variable");
 			parameter->set_property(&result, "name", NULL);
 			if(param_rep)
 			{

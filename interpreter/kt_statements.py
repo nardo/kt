@@ -2,24 +2,6 @@ from kt_program_tree import *
 from kt_expressions import *
 from kt_types import *
 
-class node_variable_declaration_stmt(program_node):
-	def analyze(self, func):
-		if self.type_spec is None:
-			self.type_spec = node_locator_type_specifier("variable")
-		func.add_local_variable(self, self.name, self.type_spec)
-		# if the statement has an assignment expression, generate an assignment statement for the assignment
-		if self.assign_expr is not None:
-			self.assign_stmt = node_expression_stmt()
-			self.assign_stmt.expr = node_assign_expr()
-			self.assign_stmt.expr.left = node_locator_expr()
-			self.assign_stmt.expr.left.string = self.name
-			self.assign_stmt.expr.right = self.assign_expr
-			#print "  Adding assignment statement: " + str(assign_stmt)
-			self.assign_stmt.analyze(func)
-	def compile(self, func, continue_label_id, break_label_id):
-		if self.assign_stmt is not None:
-			func.append_code(self.type_spec.emit_declaration(self.name) + ";\n")
-			self.assign_stmt.compile(func, continue_label_id, break_label_id)
 class node_continue_stmt(program_node):
 	def analyze(self, func):
 		if func.loop_count == 0:

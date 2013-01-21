@@ -16,7 +16,7 @@ function test_function()
 	return result
 
 function multi_return_type()
-	return "hello", ", world"
+	return "hello, world - sorry, the multiple return expressions feature has been removed."
 
 function main()
 	var string = test_function()

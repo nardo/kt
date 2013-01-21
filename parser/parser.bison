@@ -11,7 +11,7 @@
 
 %{
 
-// (C) 2009 Mark Frohnmayer.  The use of this code is governed by its license.  See /license/info.txt in the source distribution for the full license agreement.
+// The kt programming language.  Parser grammar © 2012 Mark Frohnmayer.  The use of this code is governed by its license.  See /license/info.txt in the source distribution for the full license agreement.
 
 #include "kt.h"
 
@@ -206,20 +206,26 @@ optional_parameter_list
 parameter_list
 	: IDENTIFIER optional_type_specifier
 	{
-		YYSTYPE pair;
-		pair = node(parameter);
-		field(pair, name, $1);
-		field(pair, type_spec, $2);
-		$$ = list(pair);		
+		YYSTYPE var;
+		var = node(variable);
+		field(var, is_public, boolean(false) );
+		field(var, is_shared, boolean(false) );
+		field(var, assign_expr, nil);
+		field(var, name, $1);
+		field(var, type_spec, $2);
+		$$ = list(var);
 	}
 	| parameter_list ',' IDENTIFIER optional_type_specifier
 	{
-		YYSTYPE pair;
-		pair = node(parameter);
-		field(pair, name, $3);
-		field(pair, type_spec, $4);
+		YYSTYPE var;
+		var = node(variable);
+		field(var, is_public, boolean(false) );
+		field(var, is_shared, boolean(false) );
+		field(var, assign_expr, nil);
+		field(var, name, $3);
+		field(var, type_spec, $4);
 		$$ = $1;
-		append($1, pair);
+		append($1, var);
 	}
 	;
 
@@ -444,7 +450,8 @@ variable_declaration
 variable_declaration_statement
    : is_shared "var" IDENTIFIER optional_assignment_expression end_token
 		{
-			$$ = node(variable_declaration_stmt);
+			$$ = node(variable);
+			field($$, is_public, boolean(false) );
 			field($$, is_shared, $1);
 			field($$, name, $3);
 			field($$, assign_expr, $4);
@@ -452,7 +459,8 @@ variable_declaration_statement
 		}
    | is_shared "var" IDENTIFIER ':' type_specifier optional_assignment_expression end_token
 		{
-			$$ = node(variable_declaration_stmt);
+			$$ = node(variable);
+			field($$, is_public, boolean(false) );
 			field($$, is_shared, $1);
 			field($$, name, $3);
 			field($$, type_spec, $5);

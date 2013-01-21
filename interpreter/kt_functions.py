@@ -73,7 +73,7 @@ class node_function (function_base):
 	def add_local_variable(self, ref_node, var_name, var_type_spec):
 		if var_name in self.symbols:
 			raise compile_error, (ref_node, "Variable " + var_name + " is declared more than once.")
-		self.symbols[var_name] = slot(ref_node, slot.variable_slot, var_name, self.local_variable_count, var_type_spec)
+		self.symbols[var_name] = slot(ref_node, slot_types.variable_slot_type, var_name, self.local_variable_count, var_type_spec)
 		self.local_variable_count += 1
 		print "Var decl: " + var_name
 
@@ -100,7 +100,7 @@ class node_function (function_base):
 		self.append_code(register_type_spec.emit_declaration(register_symbol) + ";\n")
 		return register_symbol
 
-	def analyze_function(self, the_facet):
+	def analyze_function(self):
 		if self.analyzed:
 			return
 		self.analyzed = True
@@ -170,7 +170,3 @@ class node_function_expr(node_function):
 
 class node_selector_pair(program_node):
 	pass
-
-class node_parameter(program_node):
-	pass
-

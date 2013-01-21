@@ -15,8 +15,8 @@ class type_specifier(program_node):
 		array_type = 6
 		map_type = 7
 	def type_kind(self):
-		return invalid_type
-	def resolve(self, func):
+		return type_specifier.kind.invalid_type
+	def resolve(self, scope):
 		pass
 	def emit_declaration(self, var_name_str):
 		return "variable " + var_name_str
@@ -57,13 +57,6 @@ class type_specifier(program_node):
 	def get_container_value_type(self):
 		return None
 
-
-class node_locator_type_specifier(type_specifier):
-	def __init__(self, locator = None):
-		type_specifier.__init__(self)
-		self.locator = locator
-	pass
-
 class node_reference_type_specifier(type_specifier):
 	pass
 
@@ -71,5 +64,7 @@ class node_array_type_specifier(type_specifier):
 	pass
 
 class node_builtin_type(type_specifier):
+	def get_c_name(self):
+		return self.name
 	pass
 

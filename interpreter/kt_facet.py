@@ -1,9 +1,11 @@
 __author__ = 'markf'
 
-from kt_program_tree import *
+from kt_construct_node import *
 #from kt_builtin_functions import *
 #from kt_builtin_classes import *
 #from kt_program_declarations import *
+from kt_locator import *
+import kt_globals
 import kt
 from kt_file_tree import ast_node
 
@@ -61,11 +63,12 @@ class facet:
 		self.builtin_type_spec_string = node_locator_type_specifier("/builtins/string")
 		self.builtin_type_spec_variable = node_locator_type_specifier("/builtins/variable")
 
-		self.root = construct_node('object')
+		self.root = node_object()
 		self.root.name = 'Root'
 		self.add_global(self.root)
 
 	def process(self, file_tree):
+		kt_globals.current_facet = self
 		self.root.body = [kt.query_builtins(ast_node)]
 		build_facet_program_tree(self, file_tree)
 		builtins_node = self.root.contents['builtins']
@@ -81,7 +84,7 @@ class facet:
 
 		print "Analyzing Functions"
 		for func in self.functions:
-			func.analyze_function(self)
+			func.analyze_function() # self)
 
 		# output the compiled code
 		emit_string = self.emit_standard_includes() +\
@@ -93,6 +96,7 @@ class facet:
 					"};\n}\n"
 		print "Facet compiles to:\n"
 		print emit_string
+		kt_globals.current_facet = None
 
 	def emit_standard_includes(self):
 		return "#include \"standard_library.h\"\n"
@@ -167,7 +171,7 @@ class facet:
 			if node.contents.has_key(path[0]):
 				node = node.contents[path[0]]
 			else:
-				new_node = construct_node('object')
+				new_node = node_object()
 				new_node.name = path[0]
 				new_node.body = []
 				new_node.parent_decl = ['directory' ]

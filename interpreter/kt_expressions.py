@@ -1,5 +1,7 @@
 from kt_program_tree import *
 from kt_slot import *
+from kt_locator_types import *
+#from kt_locator import *
 
 def compile_boolean_expression(func, expr):
 	return expr.compile(func, ('boolean'))
@@ -21,52 +23,6 @@ class node_expression(program_node):
 		pass
 	def get_preferred_type_spec(self, func):
 		return func.facet.builtin_type_spec_variable
-
-class node_locator_expr(node_expression):
-
-
-	def __init__(self):
-		node_expression.__init__(self)
-		self.locator_type = node_locator_expr.unknown_type
-		self.slot = None
-		self.resolved = False
-		self.string = None
-
-	def resolve(self, func):
-		if self.resolved:
-			return
-		self.resolved = True
-		self.slot, self.foo, self.bar = resolve_locator(func, self.string)
-
-	def get_preferred_type_spec(self, func):
-		self.resolve(func)
-		return self.slot.type_spec
-
-	def analyze(self, func, type_spec):
-		self.resolve(func)
-		self.slot.type_spec.check_conversion(type_spec)
-
-	def analyze_lvalue(self, func, type_spec):
-		self.resolve(func)
-		if self.locator_type > node_locator_expr.last_lvalue_type:
-			raise compile_error, (self, "Symbol " + self.string + " was not found or cannot be assigned a value.")
-
-	def compile(self, func, result_symbol, type_spec):
-		if self.slot.type_spec.is_equivalent(type_spec):
-			if result_symbol is not None:
-				func.append_code(result_symbol + " = " + self.c_name + ";\n")
-				return result_symbol
-			else:
-				return self.c_name
-		else:
-			if result_symbol is None:
-				result_symbol = func.add_register(type_spec)
-			func.append_type_conversion(self.c_name, self.locator_type, result_symbol, type_spec)
-			return result_symbol
-
-	def compile_lvalue(self, func):
-		return self.c_name, self.locator_type
-
 
 class node_int_constant_expr(node_expression):
 	def __init__(self):
@@ -289,7 +245,7 @@ class node_slot_expr(node_expression):
 					raise compile_error, (self, "compound " + func.compound.name + " has no declared parent.")
 				if self.slot_name not in parent_node.members:
 					raise compile_error, (self, "Parent of " + func.compound.name + " has no member named " + self.slot_name)
-				slot = parent_record.members[self.slot_name]
+				slot = parent_node.members[self.slot_name]
 				if slot.type != 'function':
 					raise compile_error, (self, "parent expression must reference a function.")
 				self.parent_function = slot.function_decl
@@ -348,6 +304,7 @@ class node_slot_expr(node_expression):
 		self.object_expr.analyze(func, self.compound_type)
 		self.slot_type.check_conversion(return_type_spec)
 	def compile_lvalue(self, func):
+		compound_symbol = self.object_expr.compile(func, None, self.compound_type)
 		if self.dynamic_lookup:
 			slot_ref = "__dynamic_field_lookup(" + compound_symbol + ", \"" + self.slot_name + "\")"
 		else:
