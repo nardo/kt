@@ -10,6 +10,7 @@ from kt_slot import *
 from kt_variable import *
 from kt_locator import *
 from kt_locator_expr import *
+from kt_type_nodes import *
 
 ast_node_lookup_table = {}
 
@@ -71,7 +72,9 @@ def build_facet_program_tree(the_facet, file_tree):
 			parent = 'resource' if file.type == 'resource' else 'directory'
 			decl = node_object()
 			decl.name = file.name
-			decl.parent_decl = [parent]
+			decl.parent_decl = node_parent_specifier()
+			decl.parent_decl.parent = parent
+			decl.parent_decl.args = []
 			decl.body = []
 			decl.compound = facet_node
 			decl.file_node = file

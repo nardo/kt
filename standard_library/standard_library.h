@@ -26,14 +26,21 @@ struct kt_program
 	{
 		
 	};
-	
+
+	struct variable
+	{
+		char data[16];
+	};
+
 	static void print(string the_string)
 	{
 		printf("%s\n", the_string.c_str());
 	}
 	kt_program() : _type_database(&_context)
 	{
+		_type_database.add_basic_type("variable", get_global_type_record<variable>());
 		_type_database.add_basic_type("string", get_global_type_record<string>());
+		_type_database.add_basic_type("boolean", get_global_type_record<bool>());
 		_type_database.add_basic_type("int32", get_global_type_record<int32>());
 		_type_database.add_basic_type("float64", get_global_type_record<float64>());
 		_type_database.add_basic_type("none", get_global_type_record<empty_type>());

@@ -1,5 +1,5 @@
-LEX=flex
-YACC=bison
+LEX=/usr/local/bin/flex
+YACC=/usr/local/bin/bison
 CPPFLAGS=-I/usr/include/python2.5 -I../../ -I../standard_library
 LDFLAGS=-lpython2.5 -lstdc++ -framework Foundation
 python: main.o parser.o lexical_analyzer.o

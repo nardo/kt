@@ -14,6 +14,23 @@
 #include <Foundation/NSBundle.h>
 #include "standard_library.h"
 
+function get_letter(string &the_str, int index)
+{
+	return the_str[index]
+}
+
+string test_function(void)
+	string part1 = "hello"
+	string part2 = ", world!"
+
+	string result = part1
+	for(int i = 0; part2[i], i++)
+		cout << i
+		result = result + get_letter(part2, i)
+		if(i > 20)
+			break
+	return result
+
 void objc_test()
 {
 	NSBundle *bundle = [[NSBundle alloc] initWithPath: @"/System/Library/Frameworks/AppKit.framework"];
@@ -103,7 +120,7 @@ static PyObject *kt_parse_py(PyObject *self, PyObject *args)
 		
 	uint len = strlen(script_data);
 	parse_result result;
-	kt_parse(script_data, len, result);
+	parse_buffer(script_data, len, result);
 	result.dump_as_text();
 
 	if(result.error)
@@ -131,7 +148,11 @@ static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
 		return NULL;
 	parse_result result;
 	parse_node_ptr builtins_node = result.add_node("object");
-	builtins_node->set_property(&result, "parent_decl", result.add_list(result.add_c_string("directory")));
+	parse_node_ptr parent_decl = result.add_node("parent_specifier");
+	parent_decl->set_property(&result, "parent", result.add_c_string("directory"));
+	parent_decl->set_property(&result, "args", result.add_list(NULL));
+
+	builtins_node->set_property(&result, "parent_decl", parent_decl);
 	builtins_node->set_property(&result, "is_public", result.add_int(0));
 	builtins_node->set_property(&result, "name", result.add_c_string("builtins"));
 	builtins_node->set_property(&result, "parameter_list", NULL);
@@ -147,6 +168,7 @@ static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
 		{
 			parse_node_ptr type_node = result.add_node("builtin_type");
 			type_node->set_property(&result, "name", result.add_c_string(val->name.c_str()));
+			type_node->set_property(&result, "is_numeric", result.add_int(val->type->is_numeric));
 			body->append(type_node);
 		}
 		else
@@ -154,8 +176,13 @@ static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
 			parse_node_ptr compound_node = result.add_node("builtin_class");
 			compound_node->set_property(&result, "name", result.add_c_string(val->name.c_str()));
 			parse_node_ptr compound_body = result.add_list(NULL);
+			parse_node_ptr parent_specifier = result.add_node("parent_specifier");
+			compound_node->set_property(&result, "parent_decl", parent_specifier);
+			parent_specifier->set_property(&result, "args", result.add_list(NULL));
 			if(val->parent_class)
-				compound_node->set_property(&result, "parent_decl", result.add_list(result.add_c_string(val->parent_class->name.c_str())));
+				parent_specifier->set_property(&result, "name", result.add_c_string(val->parent_class->name.c_str()));
+			else
+				parent_specifier->set_property(&result, "name", NULL);
 
 			compound_node->set_property(&result, "body", compound_body);
 			for(core::dictionary<core::type_database::field_rep>::pointer fp = val->fields.first(); fp; fp = fp.next())
@@ -185,7 +212,7 @@ static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
 					core::type_record *param_type = sig->argument_types[i];
 					core::type_database::type_rep *param_rep = the_program._type_database.find_type(param_type);
 					
-					parse_node_ptr parameter = result.add_node("variable");
+					parse_node_ptr parameter = result.add_node("parameter");
 					parameter->set_property(&result, "name", NULL);
 					if(param_rep)
 					{
@@ -226,7 +253,7 @@ static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
 			core::type_record *param_type = sig->argument_types[i];
 			core::type_database::type_rep *param_rep = the_program._type_database.find_type(param_type);
 			
-			parse_node_ptr parameter = result.add_node("variable");
+			parse_node_ptr parameter = result.add_node("parameter");
 			parameter->set_property(&result, "name", NULL);
 			if(param_rep)
 			{

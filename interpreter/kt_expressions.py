@@ -1,7 +1,8 @@
 from kt_program_tree import *
 from kt_slot import *
 from kt_locator_types import *
-#from kt_locator import *
+from kt_locator import *
+
 
 def compile_boolean_expression(func, expr):
 	return expr.compile(func, ('boolean'))
@@ -10,26 +11,65 @@ def compile_void_expression(func, expr):
 	return expr.compile(func, ('any'))
 
 class node_expression(program_node):
-	def analyze(self, func, result_type_specifier):
+	def analyze_expr_structure(self, func):
 		pass
-	def analyze_lvalue(self, func, result_type_specifier):
+	def analyze_expr_types(self, func, result_type_qualifier):
+		pass
+	def analyze_lvalue(self, func, result_type_qualifier):
 		raise compile_error, (self, "Expression is not an l-value.")
 		pass
-	def compile(self, func, result_symbol, result_type_specifier):
+	def compile(self, func, result_symbol, result_type_qualifier):
 		pass
 	def compile_lvalue(self, func):
 		# the compile_lvalue method returns a touple containing first a compiled expression string representing the lvalue location and the type specifier for that lvalue.
 		return "symbol_name", None
 		pass
-	def get_preferred_type_spec(self, func):
-		return func.facet.builtin_type_spec_variable
+	def get_preferred_type_qualifier(self, func):
+		return func.facet.builtin_type_qualifier_variable
+
+class node_locator_expr(node_expression):
+	def __init__(self):
+		node_expression.__init__(self)
+		self.location = None
+		self.string = None
+		self.c_name = None
+
+	def analyze_expr_structure(self, func):
+		self.location = resolve_locator(func, self.string, self)
+
+	def get_preferred_type_qualifier(self, func):
+		return self.location.get_type_qualifier()
+
+	def analyze_expr_types(self, func, result_type_qualifier):
+		self.location.get_type_qualifier().check_conversion(result_type_qualifier)
+
+	def analyze_lvalue(self, func, type_spec):
+		if self.location.locator_type > locator_types.last_lvalue:
+			raise compile_error, (self, "Symbol " + self.string + " was not found or cannot be assigned a value.")
+
+	def compile(self, func, result_symbol, type_spec):
+		if self.resolved_location.slot.type_spec.is_equivalent(type_spec):
+			if result_symbol is not None:
+				func.append_code(result_symbol + " = " + self.resolved_location.c_name + ";\n")
+				return result_symbol
+			else:
+				return self.resolved_location.c_name
+		else:
+			if result_symbol is None:
+				result_symbol = func.add_register(self.resolved_location.type_spec)
+			func.append_type_conversion(self.resolved_location.c_name, self.resolved_location.locator_type, result_symbol, type_spec)
+			return result_symbol
+
+	def compile_lvalue(self, func):
+		return self.resolved_location.c_name, self.resolved_location.locator_type
+
 
 class node_int_constant_expr(node_expression):
 	def __init__(self):
 		node_expression.__init__(self)
 		self.value = None
-	def analyze(self, func, result_type_specifier):
-		if not result_type_specifier.is_numeric():
+	def analyze_expr_types(self, func, result_type_qualifier):
+		if not result_type_qualifier.is_numeric:
 			raise compile_error, (self, "integer constant expression is not valid here.")
 	def compile(self, func, result_symbol, type_spec):
 		if result_symbol is None:
@@ -37,39 +77,39 @@ class node_int_constant_expr(node_expression):
 		func.append_code(result_symbol + " = " + self.value + ";\n")
 		return result_symbol
 
-	def get_preferred_type_spec(self, func):
-		return func.facet.builtin_type_spec_integer
+	def get_preferred_type_qualifier(self, func):
+		return func.facet.type_dictionary.builtin_type_qualifier_integer
 
 class node_float_constant_expr(node_expression):
 	def __init__(self):
 		node_expression.__init__(self)
 		self.value = None
-	def analyze(self, func, result_type_specifier):
-		if not result_type_specifier.is_numeric():
+	def analyze_expr_types(self, func, result_type_qualifier):
+		if not result_type_qualifier.is_numeric():
 			raise compile_error, (self, "floating point constant expression is not valid here.")
+	def get_preferred_type_qualifier(self, func):
+		return func.facet.type_dictionary.builtin_type_qualifier_float
 	def compile(self, func, result_symbol, type_spec):
 		if result_symbol is None:
 			result_symbol = func.add_register(type_spec)
 		func.append_code(result_symbol + " = " + self.value + ";\n")
 		return result_symbol
-	def get_preferred_type_spec(self, func):
-		return func.facet.builtin_type_spec_float
 
 class node_string_constant(node_expression):
 	def __init__(self):
 		node_expression.__init__(self)
 		self.value = None
-	def analyze(self, func, result_type_specifier):
-		if not result_type_specifier.is_string():
+	def analyze_expr_types(self, func, result_type_qualifier):
+		if not result_type_qualifier.is_string:
 			raise compile_error, (self, "string constant expression is not valid here.")
 		self.string_index = func.facet.add_string_constant(self.value)
+	def get_preferred_type_qualifier(self, func):
+		return func.facet.type_dictionary.builtin_type_qualifier_string
 	def compile(self, func, result_symbol, type_spec):
 		if result_symbol is None:
 			result_symbol = func.add_register(type_spec)
 		func.append_code(result_symbol + " = __string_constants[" + self.string_index + "];\n")
 		return result_symbol
-	def get_preferred_type_spec(self, func):
-		return func.facet.builtin_type_spec_string
 
 class node_strcat_expr(node_expression):
 	def __init__(self):
@@ -82,11 +122,13 @@ class node_strcat_expr(node_expression):
 		if self.op not in node_strcat_expr.op_table:
 			raise compile_error, (self, "Unknown string cat operator" + str(self.op))
 		return node_strcat_expr.op_table[self.op]
-
-	def analyze(self, func, type_spec):
-		func.facet.builtin_type_spec_string.check_conversion(type_spec)
-		self.left.analyze(func, func.facet.builtin_type_spec_string)
-		self.right.analyze(func, func.facet.builtin_type_spec_string)
+	def analyze_expr_structure(self, func):
+		self.left.analyze_expr_structure(func)
+		self.right.analyze_expr_structure(func)
+	def analyze_expr_types(self, func, result_type_qualifier):
+		func.facet.type_dictionary.builtin_type_qualifier_string.check_conversion(result_type_qualifier)
+		self.left.analyze_expr_types(func, func.facet.type_dictionary.builtin_type_qualifier_string)
+		self.right.analyze_expr_types(func, func.facet.type_dictionary.builtin_type_qualifier_string)
 
 	def compile(self, func, result_symbol, type_spec):
 		if result_symbol is None:
@@ -113,21 +155,25 @@ class node_array_index_expr(node_expression):
 		if self.resolved:
 			return
 		self.resolved = 1
-		self.container_type = self.array_expr.get_preferred_type()
-		if not self.container_type.is_container():
+		self.container_type = self.array_expr.get_preferred_type_qualifier(func)
+		if not self.container_type.is_container:
 			raise compile_error, (self, "this type is not a container.")
-		self.container_value_type = self.container_type.get_container_value_type()
-		self.container_key_type = self.container_type.get_container_key_type()
+		self.container_value_type = self.container_type.container_value_type
+		self.container_key_type = self.container_type.container_key_type
 
-	def get_preferred_type_spec(self, func):
+	def get_preferred_type_qualifier(self, func):
 		self.resolve(func)
 		return self.container_value_type
 
-	def analyze(self, func, type_spec):
+	def analyze_expr_structure(self, func):
+		self.array_expr.analyze_expr_structure(func)
+		self.index_expr.analyze_expr_structure(func)
+
+	def analyze_expr_types(self, func, result_type_qualifier):
 		self.resolve(func)
-		self.array_expr.analyze(func, self.container_type)
-		self.index_expr.analyze(func, self.container_key_type)
-		self.container_value_type.check_conversion(type_spec)
+		self.array_expr.analyze_expr_types(func, self.container_type)
+		self.index_expr.analyze_expr_types(func, self.container_key_type)
+		self.container_value_type.check_conversion(result_type_qualifier)
 
 	def analyze_lvalue(self, func, type_spec):
 		self.analyze(func, type_spec)
@@ -546,12 +592,20 @@ class node_conditional_expr(node_expression):
 		func.append_code(label(end_label_id))
 
 class node_assign_expr(node_expression):
-	def get_preferred_type_spec(self, func):
-		return self.left.get_preferred_type_spec(func)
-	def analyze(self, func, type_spec):
-		self.left.analyze_lvalue(func, type_spec)
-		left_type_spec = self.left.get_preferred_type_spec(func)
-		self.right.analyze(func, left_type_spec)
+	def __init__(self):
+		node_expression.__init__(self)
+		self.left = None
+		self.right = None
+	def get_preferred_type_qualifier(self, func):
+		return self.left.get_preferred_type_qualifier(func)
+	def analyze_expr_structure(self, func):
+		self.left.analyze_expr_structure(func)
+		self.right.analyze_expr_structure(func)
+	def analyze_expr_types(self, func, result_type_qualifier):
+		self.left.analyze_lvalue(func, result_type_qualifier)
+		left_type_qualifier = self.left.get_preferred_type_qualifier(func)
+		self.right.analyze_expr_types(func, left_type_qualifier)
+
 	def compile(self, func, return_symbol, type_spec):
 		lvalue_symbol, lvalue_type = self.left.compile_lvalue(func)
 		if return_symbol is None:

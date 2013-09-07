@@ -6,7 +6,7 @@ function test_function()
 		return part2[index]
 	
 	var result = part1
-	var i: integer
+	var i: int32
 
 	for i = 0; part2[i]; i += 1
 		print(i)
@@ -14,9 +14,6 @@ function test_function()
 		if i > 20
 			break
 	return result
-
-function multi_return_type()
-	return "hello, world - sorry, the multiple return expressions feature has been removed."
 
 function main()
 	var string = test_function()

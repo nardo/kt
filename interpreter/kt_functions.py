@@ -1,6 +1,14 @@
 from kt_program_tree import *
 from kt_statements import node_return_stmt
 from kt_slot import *
+import kt_globals
+
+class node_parameter(program_node):
+	def __init__(self):
+		program_node.__init__(self)
+		self.name = None
+		self.type_spec = None
+		self.member = None
 
 class function_base (program_node):
 	def __init__(self):
@@ -25,7 +33,14 @@ class node_function (function_base):
 
 	def __init__(self):
 		function_base.__init__(self)
-		self.analyzed = False
+		self.name = None
+		self.parameter_list = None
+		self.statements = None
+
+		self.compiled_statements = ""
+		self.structure_analyzed = False
+		self.types_analyzed = False
+
 		self.function_expr_count = 0
 		self.loop_count = 0
 		self.switch_count = 0
@@ -37,6 +52,8 @@ class node_function (function_base):
 		self.symbols = {}
 		self.registers_by_type_id = {}
 		self.child_functions = []
+		self.instruction_list = [] # when function is evaluated, body statement tree becomes a linear instruction list
+		self.branch_target_list = []
 		self.references_instance_variables = False
 		self.facet = None
 		self.has_override = False
@@ -44,6 +61,10 @@ class node_function (function_base):
 		self.is_class_function = False
 		self.vtable_index = None
 		self.return_type = None
+		self.qualified_type = None
+		self.return_type_qualifier = None
+
+		self.registers_by_type_id = []
 
 	def get_type_signature(self):
 		return None
@@ -73,7 +94,7 @@ class node_function (function_base):
 	def add_local_variable(self, ref_node, var_name, var_type_spec):
 		if var_name in self.symbols:
 			raise compile_error, (ref_node, "Variable " + var_name + " is declared more than once.")
-		self.symbols[var_name] = slot(ref_node, slot_types.variable_slot_type, var_name, self.local_variable_count, var_type_spec)
+		self.symbols[var_name] = compound_member(ref_node, compound_member_types.slot, var_name, self.local_variable_count, var_type_spec)
 		self.local_variable_count += 1
 		print "Var decl: " + var_name
 
@@ -84,14 +105,14 @@ class node_function (function_base):
 		if func.name in self.symbols:
 			raise compile_error, (func, "Symbol " + func.name + " is already declared in this scope.")
 
-		self.symbols[func.name] = slot(self, slot.function_slot, func.name, len(self.child_functions), self, None, func)
+		self.symbols[func.name] = compound_member(self, compound_member_types.function, func.name, len(self.child_functions), None, func)
 		self.child_functions.append(func)
 
-	def add_register(self, register_type_spec):
-		type_id = register_type_spec.get_type_id()
-		if type_id not in registers_by_type_id:
-			registers_by_type_id[type_id] = node_function.register()
-		register = registers_by_type_id[type_id]
+	def add_register(self, register_type_qualifier):
+		type_id = register_type_qualifier.get_type_id()
+		if type_id not in self.registers_by_type_id:
+			self.registers_by_type_id[type_id] = node_function.register()
+		register = self.registers_by_type_id[type_id]
 		register.in_use += 1
 		register_symbol = "register_" + type_id + "_" + register.in_use
 		if register.in_use <= register.allocated_count:
@@ -100,20 +121,18 @@ class node_function (function_base):
 		self.append_code(register_type_spec.emit_declaration(register_symbol) + ";\n")
 		return register_symbol
 
-	def analyze_function(self):
-		if self.analyzed:
+	def analyze_function_structure(self):
+		if self.structure_analyzed:
 			return
-		self.analyzed = True
+		self.structure_analyzed = True
 
-		print "..analyzing function " + self.name
+		print "..analyzing function structure of " + self.name
 		return_stmt_decl = None
 		for arg in self.parameter_list:
 			if arg.name in self.symbols:
 				raise compile_error, (self, "Argument " + arg.name + " is declared more than once.")
-			self.symbols[arg.name] = ('arg', self.arg_count)
-			if arg.type_spec == None:
-				arg.type_spec = node_locator_type_specifier()
-				arg.type_spec.locator = "variable"
+			arg.member = compound_member(self, compound_member_types.slot, arg.name, self.arg_count, arg.type_spec)
+			self.symbols[arg.name] = arg.member
 			self.arg_count += 1
 			#print "Arg: " + arg
 		if len(self.statements) == 0 or self.statements[-1].__class__ is not node_return_stmt:
@@ -121,12 +140,39 @@ class node_function (function_base):
 			return_stmt_decl.return_expression_list = []
 			self.statements.append(return_stmt_decl)
 
-		self.analyze_block(self.statements)
-		print self.name + " - analysis complete"
+		self.analyze_block_structure(self.statements)
+		print self.name + " - structure analysis complete"
 
-	def analyze_block(self, statement_list):
+	def analyze_signature(self):
+		for arg in self.parameter_list:
+			arg.member.assign_qualified_type(self)
+		if self.return_type is None:
+			self.return_type_qualifier = kt_globals.current_facet.type_dictionary.builtin_type_qualifier_none
+		else:
+			self.return_type.resolve(self)
+			self.return_type_qualifier = self.return_type.qualified_type
+
+		arg_type_qualifier_list = [arg.member.qualified_type for arg in self.parameter_list]
+		self.qualified_type = kt_globals.current_facet.type_dictionary.get_type_function(arg_type_qualifier_list, self.return_type_qualifier)
+
+	def analyze_types(self):
+		if self.types_analyzed:
+			return
+		self.types_analyzed = True
+		for member in self.symbols.values():
+			member.assign_qualified_type(self)
+
+		print "..analyzing types of function " + self.name
+		self.analyze_block_types(self.statements)
+		print self.name + " - types analysis complete"
+
+	def analyze_block_structure(self, statement_list):
 		for stmt in statement_list:
-			stmt.analyze(self)
+			stmt.analyze_stmt_structure(self)
+
+	def analyze_block_types(self, statement_list):
+		for stmt in statement_list:
+			stmt.analyze_stmt_types(self)
 
 	def append_code(self, the_string):
 		self.code += the_string
@@ -152,18 +198,28 @@ class node_function (function_base):
 			stmt.compile(self, continue_label_id, break_label_id)
 
 class node_function_declaration_stmt(node_function):
-	def analyze(self, func):
+	def analyze_stmt_structure(self, func):
 		func_name = self.name
 		func.add_child_function(self)
+	def analyze_stmt_types(self, func):
+		pass
 
 class node_function_expr(node_function):
-	def analyze(self, func, valid_types):
+	def __init__(self):
+		node_function.__init__(self)
+		self.expr = None
+
+	def analyze_expr_structure(self, func):
 		func.function_expr_count += 1
 		self.name = "__func_expr_" + func.function_expr_count
 		return_stmt = node_return_stmt()
 		return_stmt.return_expression_list = (self.expr,)
 		self.statements = [return_stmt]
 		func.add_child_function(self)
+
+	def analyze_expr_types(self, func, type_qual):
+		self.signature_type_qualifier.check_conversion(type_qual)
+
 
 	def compile(self, func, valid_types):
 		return 'load_sub_function', self.result_register, self

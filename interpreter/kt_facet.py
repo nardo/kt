@@ -7,6 +7,7 @@ from kt_construct_node import *
 from kt_locator import *
 import kt_globals
 import kt
+from kt_type_qualifier import *
 from kt_file_tree import ast_node
 
 # returns the number of elements that are the same in two lists starting from
@@ -36,7 +37,7 @@ def common_list_length(list1, list2):
 #
 # how this breaks down
 
-class node_basic_type (type_specifier):
+class node_basic_type (type_qualifier):
 	def __init__(self, type_id):
 		self.type_id = type_id
 		self.type = kt_type.kind.basic_type
@@ -52,16 +53,8 @@ class facet:
 		self.globals_list = []
 		self.functions = []
 		self.globals_by_id = []
+		self.type_dictionary = type_dictionary()
 		self.next_label_id = 1
-		self.next_type_id = 0
-		self.type_list = []
-
-		self.builtin_type_spec_none = node_locator_type_specifier("/builtins/empty_type")
-		self.builtin_type_spec_boolean = node_locator_type_specifier("/builtins/boolean")
-		self.builtin_type_spec_integer = node_locator_type_specifier("/builtins/integer")
-		self.builtin_type_spec_float = node_locator_type_specifier("/builtins/float")
-		self.builtin_type_spec_string = node_locator_type_specifier("/builtins/string")
-		self.builtin_type_spec_variable = node_locator_type_specifier("/builtins/variable")
 
 		self.root = node_object()
 		self.root.name = 'Root'
@@ -69,33 +62,79 @@ class facet:
 
 	def process(self, file_tree):
 		kt_globals.current_facet = self
+
+		# create the root node of the program tree
 		self.root.body = [kt.query_builtins(ast_node)]
+
+		# build the full program tree from the file tree and its parsed syntax trees
+		# all compounds are added as globals
+		# all declarations (functions, variables) at the top level of each file are added as globals
 		build_facet_program_tree(self, file_tree)
+
+		# all nodes in builtins are added as globals
 		builtins_node = self.root.contents['builtins']
 		for node in builtins_node.contents.values():
 			if not node.is_compound():
 				self.add_global(node)
 
+		# set qualifiers for the builtin types
+		self.find_node(None, "/builtins/none").qualified_type = self.type_dictionary.builtin_type_qualifier_none
+		self.find_node(None, "/builtins/boolean").qualified_type = self.type_dictionary.builtin_type_qualifier_boolean
+		self.find_node(None, "/builtins/int32").qualified_type = self.type_dictionary.builtin_type_qualifier_integer
+		self.find_node(None, "/builtins/float64").qualified_type = self.type_dictionary.builtin_type_qualifier_float
+		self.find_node(None, "/builtins/string").qualified_type = self.type_dictionary.builtin_type_qualifier_string
+		self.find_node(None, "/builtins/variable").qualified_type = self.type_dictionary.builtin_type_qualifier_variable
+
 		print "Globals: " + str(" ".join(g.name for g in self.globals_list))
 
-		print "Analyzing compounds"
+		# the program tree is processed as follows:
+		# 1. Process all compound definitions - build the derivation hierarchy and membership of all compounds
+		# 2. Process all function definitions - build local variable lists, and translate statement structure into linear operation instruction lists
+		# 3. Qualify the types of all program variables and structures. type id and type_qualifier for
+
+		print "Analyzing Compound Structures"
 		for c in (x for x in self.globals_list if x.is_compound()):
-			c.analyze_compound(self)
+			c.connect_parentage_and_sort_compounds(self)
+		for c in self.sorted_compounds:
+			c.analyze_compound_structure(self)
+		sys.stdout.flush()
 
-		print "Analyzing Functions"
+		print "Analyzing Function Structures"
 		for func in self.functions:
-			func.analyze_function() # self)
+			func.analyze_function_structure()
+		sys.stdout.flush()
+		sys.stderr.flush()
 
-		# output the compiled code
-		emit_string = self.emit_standard_includes() +\
-					"namespace core {\n"+\
-					self.emit_string_table() +\
-					"struct program {\n" +\
-					self.emit_classdefs() +\
-					self.emit_functions() +\
-					"};\n}\n"
-		print "Facet compiles to:\n"
-		print emit_string
+		print "Assigning Compound Types"
+		for c in self.sorted_compounds:
+			c.assign_qualified_type(self)
+
+		print "Analyzing Function Signatures"
+		for func in self.functions:
+			func.analyze_signature()
+
+		print "Analyzing Compound Member Types"
+		for c in self.sorted_compounds:
+			c.analyze_compound_types(self)
+
+		print "Analyzing Function Types"
+		for func in self.functions:
+			func.analyze_types()
+		sys.stdout.flush()
+
+		if False:
+			# output the compiled code
+			emit_string = self.emit_standard_includes() +\
+						"namespace core {\n"+\
+						self.emit_string_table() +\
+						"struct program {\n" +\
+						self.emit_classdefs() +\
+						self.emit_functions() +\
+						"};\n}\n"
+			print "Facet compiles to:\n"
+			print emit_string
+			sys.stdout.flush()
+
 		kt_globals.current_facet = None
 
 	def emit_standard_includes(self):
@@ -130,23 +169,6 @@ class facet:
 		self.functions.append(the_function)
 		the_function.facet = self
 
-	# add_type takes a parsed type_spec and returns an integer type id
-	# type_spec => [locator, is_array, is_reference, size_expr]
-	# if the array_expr is a non-constant expression,
-	def add_basic_type(self, type_name):
-		new_node = node_basic_type(self.next_type_id)
-		self.type_list.append(new_node)
-		self.next_type_id += 1
-		self.add_builtin_node("builtins/types/" + type_name, new_node)
-
-	def add_type(self, type_spec):
-		if type_spec.type == 'locator_type_specifier':
-			node = self.find_node(type_spec, type_spec.locator)
-			if type_id in node:
-				return type_id
-			else:
-				# build a type
-				pass
 	def add_string_constant(self, string_value):
 		if string_value in self.string_constant_lookup:
 			return self.string_constant_lookup[string_value]
@@ -174,7 +196,9 @@ class facet:
 				new_node = node_object()
 				new_node.name = path[0]
 				new_node.body = []
-				new_node.parent_decl = ['directory' ]
+				new_node.parent_decl = node_parent_specifier()
+				new_node.parent_decl.parent = 'directory'
+				new_node.parent_decl.args = []
 				node.contents[path[0]] = new_node
 				new_node.compound = node
 				node = new_node
@@ -219,7 +243,7 @@ class facet:
 					node_list.append(leaf_node)
 			if not len(node_list):
 				return None
-			elif len(node_list) == 1:
+			elif len(node_list) == 1 or search_node is None:
 				return node_list[0]
 			else:
 				# figure out which is the closest relative to search_node

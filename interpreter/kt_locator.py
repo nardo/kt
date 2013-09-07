@@ -4,51 +4,56 @@ import kt_globals
 #from kt_functions import *
 from kt_types import *
 from kt_locator_types import *
+from kt_program_tree import *
 
 class resolved_location:
 	def __init__(self):
 		self.locator_type = None
 		self.c_name = None
-		self.type_spec = None
-		self.slot = None
+		self.compound_member = None
 		self.node = None
-		#elif self.locator_type == locator_types.reference_type:
-		#self.type_spec = self.initial_node.get_reference_type_spec()
+
+	def get_type_qualifier(self):
+		if self.locator_type <= locator_types.prev_scope_child_function:
+			return self.compound_member.qualified_type
+		else:
+			return self.node.qualified_type
 
 def resolve_locator(enclosing_scope, locator_name, program_node):
 	location = resolved_location()
+	enclosing_compound = enclosing_scope.compound
+
 	if enclosing_scope.is_function():
-		enclosing_compound = enclosing_scope.compound
 		if locator_name in enclosing_scope.symbols:
-			location.slot = enclosing_scope.symbols[locator_name]
-			if location.slot.slot_type == slot_types.variable_slot_type:
-				location.locator_type = locator_types.local_variable_type
+			location.compound_member = enclosing_scope.symbols[locator_name]
+			if location.compound_member.member_type == compound_member_types.slot:
+				location.locator_type = locator_types.local_variable
 				location.c_name = locator_name
 			else:
-				location.locator_type = locator_types.child_function_type
-				location.c_name = location.slot.function_decl.get_c_name()
+				location.locator_type = locator_types.child_function
+				location.c_name = location.compound_member.function_decl.get_c_name()
 			return location
 		elif enclosing_scope.prev_scope and locator_name in enclosing_scope.prev_scope.symbols:
-			location.slot = enclosing_scope.prev_scope.symbols[locator_name]
-			if location.slot.slot_type == slot_types.variable_slot_type:
+			location.compound_member = enclosing_scope.prev_scope.symbols[locator_name]
+			if location.compound_member.member_type == compound_member_types.slot:
 				enclosing_scope.needs_prev_scope = True
 				enclosing_scope.prev_scope.scope_needed = True
-				location.locator_type = locator_types.prev_scope_variable_type
+				location.locator_type = locator_types.prev_scope_variable
 				location.c_name = "__prev_scope__->" + locator_name
 			else:
-				location.locator_type = locator_types.prev_scope_child_function_type
-				location.c_name = location.slot.function_decl.get_c_name()
+				location.locator_type = locator_types.prev_scope_child_function
+				location.c_name = location.compound_member.function_decl.get_c_name()
 			return location
-		elif enclosing_scope.compound and locator_name in enclosing_scope.compound.members:
-			location.slot = enclosing_scope.compound.members[locator_name]
-			if location.slot.is_variable():
-				location.locator_type = locator_types.instance_variable_type
+		elif enclosing_compound and locator_name in enclosing_compound.members:
+			location.compound_member = enclosing_compound.members[locator_name]
+			if location.compound_member.member_type == compound_member_types.slot:
+				location.locator_type = locator_types.instance_variable
 				location.c_name = "__self_object__->" + locator_name
-			elif location.slot.is_function():
-				location.locator_type = locator_types.method_type
-				location.c_name = location.slot.function_decl.get_c_name()
 			else:
-				raise compile_error, (enclosing_scope, "member " + locator_name + " cannot be used here.")
+				location.locator_type = locator_types.method
+				location.c_name = location.compound_member.function_decl.get_c_name()
+			#@else:
+			#	raise compile_error, (enclosing_scope, "member " + locator_name + " cannot be used here.")
 			return location
 	else:
 		enclosing_compound = enclosing_scope
@@ -56,35 +61,50 @@ def resolve_locator(enclosing_scope, locator_name, program_node):
 	node = kt_globals.current_facet.find_node(enclosing_compound, locator_name)
 	if not node:
 		raise compile_error, (program_node, "locator " + locator_name + " not found.")
+	locator_name_part = locator_name.rpartition('/')[2]
 	if node.is_compound():
-		location.locator_type = locator_types.reference_type
+		location.locator_type = locator_types.reference
 		location.node = node
 		location.c_name = node.get_c_name()
 	elif node.type == "variable":
-		location.locator_type = locator_types.global_variable_type
-		location.node = node
-		location.type_spec = node.type_spec
-		location.c_name = node.get_c_name() + "." + locator_name
+		location.locator_type = locator_types.instance_variable
+		location.node = node.compound
+		location.compound_member = location.node.members.find(node.name)
+		location.c_name = location.node.get_c_name() + "." + node.name
 	elif node.type == "function":
-		location.locator_type = locator_types.global_function_type
-		location.node = node
+		location.locator_type = locator_types.method
+		location.node = node.compound
+		location.compound_member = location.node.members.find(node.name)
 		location.c_name = node.get_c_name()
 	elif node.type == "builtin_type":
-		location.locator_type = locator_types.builtin_type_type
+		location.locator_type = locator_types.builtin_type
 		location.node = node
 		location.c_name = node.get_c_name()
+		# location.type_specifier = node.get_type_specifier()
 	else:
 		raise compile_error, (program_node, "global node " + locator_name + " cannot be used as a locator.")
 	return location
 
-class node_locator_type_specifier(type_specifier):
+class node_locator_type_specifier(program_node):
 	def __init__(self, locator = None):
-		type_specifier.__init__(self)
+		program_node.__init__(self)
 		self.locator = locator
-		self.resolved_locator = None
+		self.resolved_location = None
+		self.qualified_type = None
 	def resolve(self, scope):
-		if not self.resolved_locator:
-			self.resolved_locator = resolve_locator(scope, self.locator, self)
+		self.resolved_location = resolve_locator(scope, self.locator, self)
+		# verify that this location is a valid type
+		if self.resolved_location.locator_type < locator_types.reference:
+			raise compile_error, (self, "locator \"" + self.locator + "\" is not a valid type name.")
+		self.qualified_type = self.resolved_location.node.qualified_type
+
+	def get_qualified_type(self):
+		if self.resolved_location.locator_type <= locator_types.prev_scope_child_function:
+			self.qualified_type = self.resolved_location.compound_member.qualified_type
+		elif self.resolved_location == locator_types.reference:
+			self.qualified_type = self.resolved_location.node.qualified_type
+		elif self.resolved_location.locator_type == locator_types.builtin_type:
+			self.qualified_type = self.resolved_location.node.qualified_type
 
 		#	return
 		#self.resolved = True

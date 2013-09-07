@@ -14,4 +14,5 @@ typedef unsigned int uint;
 #include "page_allocator.h"
 #include "parser_interface.h"
 
-extern void kt_parse(const char *parse_string, uint parse_string_len, parse_result &result);
+class kt_lexer;
+extern void parse_buffer(const char *parse_string, uint parse_string_len, parse_result &result);

@@ -155,7 +155,7 @@ declaration
 	| state_declaration
 	| facet_declaration
 	| type_declaration
-	| variable_declaration
+	| slot_declaration
 	| slot_assignment_declaration
 	| function_declaration
 	| method_declaration
@@ -207,10 +207,7 @@ parameter_list
 	: IDENTIFIER optional_type_specifier
 	{
 		YYSTYPE var;
-		var = node(variable);
-		field(var, is_public, boolean(false) );
-		field(var, is_shared, boolean(false) );
-		field(var, assign_expr, nil);
+		var = node(parameter);
 		field(var, name, $1);
 		field(var, type_spec, $2);
 		$$ = list(var);
@@ -218,10 +215,7 @@ parameter_list
 	| parameter_list ',' IDENTIFIER optional_type_specifier
 	{
 		YYSTYPE var;
-		var = node(variable);
-		field(var, is_public, boolean(false) );
-		field(var, is_shared, boolean(false) );
-		field(var, assign_expr, nil);
+		var = node(parameter);
 		field(var, name, $3);
 		field(var, type_spec, $4);
 		$$ = $1;
@@ -232,13 +226,25 @@ parameter_list
 
 parent_specifier
 	:
-		{ $$ = list(nil); }
+	{
+		$$ = node(parent_specifier);
+		field($$, name, nil);
+		field($$, args, nil);
+	}
 	| ':' locator
-		{ $$ = list($2); }
+	{
+		$$ = node(parent_specifier);
+		field($$, name, $2);
+		field($$, args, list(nil));
+	}
 	| ':' locator '(' expression_list ')'
-		{ $$ = list($2); append($$, $4); }
+	{
+		$$ = node(parent_specifier);
+		field($$, name, $2);
+		field($$, args, $4);
+	}
 	;
-
+	
 locator
 	: IDENTIFIER
 		{ $$ = $1; }
@@ -306,7 +312,7 @@ object_declaration
 	| IDENTIFIER parent_specifier facet_list_specifier end_token compound_body optional_end_token
 		{ 
 			$$ = node(object);
-			field($$, is_public, false);
+			field($$, is_public, boolean(false));
 			field($$, name, $1);
 			field($$, parent_decl, $2);
 			field($$, facet_list, $3);
@@ -420,25 +426,25 @@ map_specifier
 
 optional_type_specifier
    :
-     { $$ = nil }
+     { $$ = nil; }
    | ':' type_specifier
      { $$ = $2; }
    ;
    
 /*-----------------------------------------------------------------------------------------*/  
-variable_declaration
+slot_declaration
    : is_public is_shared "var" IDENTIFIER optional_assignment_expression end_token
       {
-         $$ = node(variable);
+         $$ = node(slot_declaration);
          field($$, is_public, $1);
          field($$, is_shared, $2);
          field($$, name, $4);
          field($$, assign_expr, $5);
-	field($$, type_spec, nil);
+         field($$, type_spec, nil);
       }
    | is_public is_shared "var" IDENTIFIER ':' type_specifier optional_assignment_expression end_token
       {
-         $$ = node(variable);
+         $$ = node(slot_declaration);
          field($$, is_public, $1);
          field($$, is_shared, $2);
          field($$, name, $4);
@@ -450,8 +456,7 @@ variable_declaration
 variable_declaration_statement
    : is_shared "var" IDENTIFIER optional_assignment_expression end_token
 		{
-			$$ = node(variable);
-			field($$, is_public, boolean(false) );
+			$$ = node(variable_declaration_stmt);
 			field($$, is_shared, $1);
 			field($$, name, $3);
 			field($$, assign_expr, $4);
@@ -459,8 +464,7 @@ variable_declaration_statement
 		}
    | is_shared "var" IDENTIFIER ':' type_specifier optional_assignment_expression end_token
 		{
-			$$ = node(variable);
-			field($$, is_public, boolean(false) );
+			$$ = node(variable_declaration_stmt);
 			field($$, is_shared, $1);
 			field($$, name, $3);
 			field($$, type_spec, $5);
@@ -614,7 +618,7 @@ function_body
 
 statement_list
 	:
-		{ $$ = nil }
+		{ $$ = nil; }
 	| non_empty_statement_list
 	;
 
@@ -1327,11 +1331,12 @@ map_pair
 	;
 
 function_expression
-	: "function" '(' optional_parameter_list ')' '(' expression ')'
+	: "function" '(' optional_parameter_list ')' optional_return_type '(' expression ')'
 		{
          $$ = node(function_expr);
          field($$, parameter_list, $3);
-         field($$, expr, $6);
+         field($$, return_type_list, $5);
+         field($$, expr, $7);
       }
 	;
 

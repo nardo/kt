@@ -480,9 +480,9 @@ COMMENT		"//"[^\n\r]*
 
 %%
 
-extern int kt_parse(kt_lexer *lexer, parse_result *result);
+//extern int kt_parse(kt_lexer *lexer, parse_result *result);
 
-void kt_parse(const char *parse_string, uint parse_string_len, parse_result &result)
+void parse_buffer(const char *parse_string, uint parse_string_len, parse_result &result)
 {
 	kt_lexer lexer(parse_string, parse_string_len, &result);
 	kt_parse(&lexer, &result);
