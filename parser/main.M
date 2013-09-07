@@ -14,23 +14,6 @@
 #include <Foundation/NSBundle.h>
 #include "standard_library.h"
 
-function get_letter(string &the_str, int index)
-{
-	return the_str[index]
-}
-
-string test_function(void)
-	string part1 = "hello"
-	string part2 = ", world!"
-
-	string result = part1
-	for(int i = 0; part2[i], i++)
-		cout << i
-		result = result + get_letter(part2, i)
-		if(i > 20)
-			break
-	return result
-
 void objc_test()
 {
 	NSBundle *bundle = [[NSBundle alloc] initWithPath: @"/System/Library/Frameworks/AppKit.framework"];

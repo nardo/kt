@@ -3,41 +3,21 @@ the kt programming language
 
 Foreword (or, why kt?):
 
-kt is a new programming language designed to be an approachable high-level language for the
-description of programs (apps) and data, and at the same time maintain performance 
-characteristics that approach low-level languages like C.  kt introduces the following core 
-language features that make it well-suited to modern application development.
+(note that the text below is written in future present tense.)
 
-Approachable syntax: kt borrows the notion of whitespace-driven program structure from Python
- and blends it with a simple, clear lexicon and syntax (hints of c, python, javascript and 
-pascal) to define program structure.  Particular emphases have been placed on readability 
-and approachability by novice programmers.
+kt is a new programming language designed to be an approachable high-level language for the description of programs (apps) and data, and at the same time maintain performance characteristics that approach low-level languages like C.  kt introduces the following core language features that make it well-suited to modern application development.
 
-Integrated data (object) descriptions: The kt syntax adds support for direct declaration and 
-initialization of objects; both those that are created at program startup (directly referenced 
-in the program's execution DAG) and those that can be "loaded" latently, obviating the need to 
-use additional data description languages like XML.  Code and data can both be natively present 
-in object declarations.
+Approachable syntax: kt borrows the notion of whitespace-driven program structure from Python and blends it with a simple, clear lexicon and syntax (hints of c, python, javascript and pascal) to define program structure.  Particular emphases have been placed on readability and approachability by novice programmers.
 
-Integrated directory and program structure: The kt program object tree (namespace hierarchy) 
-and the directory structure of the program on disk are identical.  kt uses a "nearest locator" 
-heuristic to resolve ambiguities in name resolution.  As a result of this approach, program 
-elements like include paths and specific module inclusion are rendered unnecessary.
+Integrated data (object) descriptions: The kt syntax adds support for direct declaration and initialization of objects; both those that are created at program startup (directly referenced in the program's execution DAG) and those that can be "loaded" latently, obviating the need to use additional data description languages like XML.  Code and data can both be natively present in object declarations.
 
-Facets: kt natively supports a concept called "facets".  Modern applications commonly span 
-multiple execution environments connected by a network.  Consider a massively multiplayer 
-online game (MMO).  It may have a client program that displays the world to players, a zone 
-server to simulate a portion of the shared environment, a shard server to manage a platoon of 
-zones, and a login server to connect player clients to shards.  In kt, each of these facets of 
-the overall application architecture, and all the communication pathways between them can be 
-directly and simply specified.  Combined with the network system in the kt standard library, 
-this allows for vastly simplified development of high performance networked applications.
+Integrated directory and program structure: The kt program object tree (namespace hierarchy) and the directory structure of the program on disk are identical.  kt uses a "nearest locator" heuristic to resolve ambiguities in name resolution.  As a result of this approach, program elements like include paths and specific module inclusion are rendered unnecessary.
 
-Promise-based mechanism for multiprocessing and remote (latent) procedure calls:  Taking a cue 
-from the e programming language, kt natively supports promise and deferred when-block execution.
+Facets: kt natively supports a concept called "facets".  Modern applications commonly span multiple execution environments connected by a network.  Consider a massively multiplayer online game (MMO).  It may have a client program that displays the world to players, a zone server to simulate a portion of the shared environment, a shard server to manage a platoon of zones, and a login server to connect player clients to shards.  In kt, each of these facets of the overall application architecture, and all the communication pathways between them can be directly and simply specified.  Combined with the network system in the kt standard library, this allows for vastly simplified development of high performance networked applications.
 
-Tight binding with C/C++: kt is designed to have low overhead call in/call out to C/C++ as well 
-as easy integration of new native data types and classes.
+Promise-based mechanism for multiprocessing and remote (latent) procedure calls:  Taking a cue from the e programming language, kt natively supports promise and deferred when-block execution.
+
+Tight binding with C/C++: kt is designed to have low overhead call in/call out to C/C++ as well as easy integration of new native data types and classes.
 
 Other reasonable but not so core features include:
 - ability to invoke (and declare) methods using Objective-C-styled method descriptions -
@@ -46,32 +26,20 @@ Other reasonable but not so core features include:
 directory structure overview:
 
 parser:
-	parser executable - comprised of a simple python module that
-	bridges in a custom lexical analyzer build with flex and a bison
-	based parser.
+	parser executable - comprised of a simple python module that bridges in a custom lexical analyzer build with flex and a bison based parser.
 
 interpreter:
-	the bulk of the kt language platform prototype - The kt interpreter scans 
-	a kt project as a whole, parsing all .kt files it discovers, and for each facet 
-	referenced in the program, generates a full program tree.  This program tree is
-	then analyzed for semantic correctness, and can be executed/evaluated directly 
-	from a "compiled" intermediate language, or compiled into a C++ program.  The
-	C++ compilation step is not fully functional, and will soon entirely replace
-	the interpreted intermediate language.
+	the bulk of the kt language platform prototype - The kt interpreter scans a kt project as a whole, parsing all .kt files it discovers, and for each facet referenced in the program, generates a full program tree.  This program tree is then analyzed for semantic correctness, and can be executed/evaluated directly from a "compiled" intermediate language, or compiled into a C++ program.  The C++ compilation step is not fully functional, and will soon entirely replace the interpreted intermediate language.
 
 test:
 	test cases for various language features.
 
 license:
-	source code licensing information.  Initial version released under MIT
-	license (http://www.opensource.org/licenses/mit-license.php)
+	source code licensing information.  Initial version released under MIT license (http://www.opensource.org/licenses/mit-license.php)
 
 media:
 	media/branding around language and environment.
 
-kt depends on the "core" library - https://github.com/nardo/core - to build the parser.
-In order to build properly, core and kt should live in the same directory.
+kt depends on the "core" library - https://github.com/nardo/core - to build the parser.  In order to build properly, core and kt should live in the same directory.
 
-To test it all out, just run the test.sh in the root directory - it will
-build the parser and execute the first unit test which should echo a bunch
-of debug messages and a simple greeting.
+To test it all out, just run the test.sh in the root directory - it will build the parser and execute the first unit test which should echo a bunch of debug messages a simple greeting.
