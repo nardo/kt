@@ -9,8 +9,9 @@ class locator_types:
 	method = 4
 	child_function = 5
 	prev_scope_child_function = 6
-	reference = 7
-	builtin_type = 8
+	builtin_function = 7
+	reference = 8
+	builtin_type = 9
 
 	def is_variable(locator_type):
 		return locator_type == locator_types.local_variable or locator_type == locator_types.prev_scope_variable or locator_type == locator_types.instance_variable or locator_type == locator_types.global_variable

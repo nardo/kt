@@ -81,6 +81,10 @@ def resolve_locator(enclosing_scope, locator_name, program_node):
 		location.node = node
 		location.c_name = node.get_c_name()
 		# location.type_specifier = node.get_type_specifier()
+	elif node.type == "builtin_function":
+		location.locator_type = locator_types.builtin_function
+		location.node = node
+		location.c_name = node.get_c_name()
 	else:
 		raise compile_error, (program_node, "global node " + locator_name + " cannot be used as a locator.")
 	return location

@@ -253,7 +253,7 @@ static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
 		{
 			parse_node_ptr type_spec = result.add_node("locator_type_specifier");
 			type_spec->set_property(&result, "locator", result.add_c_string(return_rep->name.c_str()));
-			function_node->set_property(&result, "return_type", result.add_list(type_spec));
+			function_node->set_property(&result, "return_type", type_spec);
 		}
 		else
 			function_node->set_property(&result, "return_type", NULL);

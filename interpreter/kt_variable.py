@@ -40,5 +40,5 @@ class node_variable_declaration_stmt(program_node):
 
 	def compile(self, func, continue_label_id, break_label_id):
 		if self.assign_stmt is not None:
-			func.append_code(self.type_spec.emit_declaration(self.name) + ";\n")
+			#func.append_code(self.type_spec.emit_declaration(self.name) + ";\n")
 			self.assign_stmt.compile(func, continue_label_id, break_label_id)

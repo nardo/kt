@@ -79,11 +79,22 @@ class facet:
 
 		# set qualifiers for the builtin types
 		self.find_node(None, "/builtins/none").qualified_type = self.type_dictionary.builtin_type_qualifier_none
+		self.type_dictionary.builtin_type_qualifier_none.c_name = "none"
+
 		self.find_node(None, "/builtins/boolean").qualified_type = self.type_dictionary.builtin_type_qualifier_boolean
+		self.type_dictionary.builtin_type_qualifier_boolean.c_name = "bool"
+
 		self.find_node(None, "/builtins/int32").qualified_type = self.type_dictionary.builtin_type_qualifier_integer
+		self.type_dictionary.builtin_type_qualifier_integer.c_name = "int32"
+
 		self.find_node(None, "/builtins/float64").qualified_type = self.type_dictionary.builtin_type_qualifier_float
+		self.type_dictionary.builtin_type_qualifier_float.c_name = "float64"
+
 		self.find_node(None, "/builtins/string").qualified_type = self.type_dictionary.builtin_type_qualifier_string
+		self.type_dictionary.builtin_type_qualifier_string.c_name = "string"
+
 		self.find_node(None, "/builtins/variable").qualified_type = self.type_dictionary.builtin_type_qualifier_variable
+		self.type_dictionary.builtin_type_qualifier_variable.c_name = "variable"
 
 		print "Globals: " + str(" ".join(g.name for g in self.globals_list))
 
@@ -112,6 +123,8 @@ class facet:
 		print "Analyzing Function Signatures"
 		for func in self.functions:
 			func.analyze_signature()
+		for f in (x for x in self.globals_list if x.__class__ == node_builtin_function):
+			f.analyze_signature()
 
 		print "Analyzing Compound Member Types"
 		for c in self.sorted_compounds:
@@ -122,48 +135,44 @@ class facet:
 			func.analyze_types()
 		sys.stdout.flush()
 
-		if False:
-			# output the compiled code
-			emit_string = self.emit_standard_includes() +\
-						"namespace core {\n"+\
-						self.emit_string_table() +\
-						"struct program {\n" +\
-						self.emit_classdefs() +\
-						self.emit_functions() +\
-						"};\n}\n"
-			print "Facet compiles to:\n"
-			print emit_string
-			sys.stdout.flush()
+		print "Facet compiles to:\n"
+		self.emit_standard_includes()
+		self.emit_code("namespace core {\n")
+		self.emit_string_table()
+		self.emit_code("struct program {\n")
+		self.emit_classdefs()
+		self.emit_functions()
+		self.emit_code("};\n}\n")
 
 		kt_globals.current_facet = None
 
+	def emit_code(self, the_code):
+		sys.stdout.write(the_code)
+		sys.stdout.flush()
+
 	def emit_standard_includes(self):
-		return "#include \"standard_library.h\"\n"
+		self.emit_code( "#include \"standard_library.h\"\n")
 
 	def emit_string_table(self):
-		emit_string = "string __string_constants[" + str(len(self.string_constants)) + "];\nstatic void __init_string_constants(void)\n{\n"
+		self.emit_code("string __string_constants[" + str(len(self.string_constants)) + "];\nstatic void __init_string_constants(void)\n{\n")
 		for const_index in range(len(self.string_constants)):
 			const_str = self.string_constants[const_index]
-			emit_string += "__string_constants[" + const_index + "] = \"" + const_str + "\";\n"
-		emit_string += "}\n"
-		return emit_string
+			self.emit_code("__string_constants[" + str(const_index) + "] = \"" + const_str + "\";\n")
+		self.emit_code("}\n")
 
 	def emit_classdefs(self):
-		result = ""
 		builtins_node = self.find_node(None, "/builtins")
-		print "found builtins_node: " + str(builtins_node)
+		self.emit_code("//found builtins_node: " + str(builtins_node) + "\n")
 
 		# output a classdef for each compound that is not a builtin
 		for c in self.sorted_compounds:
 			if c.compound != builtins_node:
-				result += c.emit_classdef()
-		return result
+				c.emit_classdef(self)
 
 	def emit_functions(self):
-		return ""
-		#print "Compiling Functions"
-		#for func in self.functions:
-		#	func.compile_function()
+		self.emit_code("// Compiling Functions\n")
+		for func in self.functions:
+			func.compile_function()
 
 	def add_function(self, the_function):
 		self.functions.append(the_function)

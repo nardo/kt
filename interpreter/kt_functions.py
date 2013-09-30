@@ -15,12 +15,36 @@ class function_base (program_node):
 		program_node.__init__(self)
 		self.return_type = None
 		self.arg_count = 0
+		self.parameter_list = None
+		self.qualified_type = None
+		self.return_type_qualifier = None
+		self.prev_scope = None
 
 	def is_function(self):
 		return True
 
+	def analyze_signature(self):
+		enclosing_scope = self.compound if self.compound is not None else self.prev_scope
+
+		for arg in self.parameter_list:
+			if arg.type_spec == None:
+				arg.qualified_type = kt_globals.current_facet.type_dictionary.builtin_type_qualifier_variable
+			else:
+				arg.type_spec.resolve(enclosing_scope)
+				arg.qualified_type = arg.type_spec.qualified_type
+		if self.return_type is None:
+			self.return_type_qualifier = kt_globals.current_facet.type_dictionary.builtin_type_qualifier_none
+		else:
+			self.return_type.resolve(enclosing_scope)
+			self.return_type_qualifier = self.return_type.qualified_type
+
+		arg_type_qualifier_list = [arg.qualified_type for arg in self.parameter_list]
+		self.qualified_type = kt_globals.current_facet.type_dictionary.get_type_function(arg_type_qualifier_list, self.return_type_qualifier)
+
+
 class node_builtin_function(function_base):
-	pass
+	def get_c_name(self):
+		return self.name
 
 class node_builtin_method(function_base):
 	pass
@@ -34,7 +58,6 @@ class node_function (function_base):
 	def __init__(self):
 		function_base.__init__(self)
 		self.name = None
-		self.parameter_list = None
 		self.statements = None
 
 		self.compiled_statements = ""
@@ -48,7 +71,6 @@ class node_function (function_base):
 		self.local_variable_count = 0
 		self.needs_prev_scope = False
 		self.scope_needed = False
-		self.prev_scope = None
 		self.symbols = {}
 		self.registers_by_type_id = {}
 		self.child_functions = []
@@ -60,11 +82,8 @@ class node_function (function_base):
 		self.parent_function = None
 		self.is_class_function = False
 		self.vtable_index = None
-		self.return_type = None
-		self.qualified_type = None
-		self.return_type_qualifier = None
 
-		self.registers_by_type_id = []
+		self.registers_by_type_id = {}
 
 	def get_type_signature(self):
 		return None
@@ -109,16 +128,16 @@ class node_function (function_base):
 		self.child_functions.append(func)
 
 	def add_register(self, register_type_qualifier):
-		type_id = register_type_qualifier.get_type_id()
+		type_id = register_type_qualifier.id
 		if type_id not in self.registers_by_type_id:
 			self.registers_by_type_id[type_id] = node_function.register()
 		register = self.registers_by_type_id[type_id]
 		register.in_use += 1
-		register_symbol = "register_" + type_id + "_" + register.in_use
+		register_symbol = "register_" + str(type_id) + "_" + str(register.in_use)
 		if register.in_use <= register.allocated_count:
 			return register_symbol
 		register.allocated_count += 1
-		self.append_code(register_type_spec.emit_declaration(register_symbol) + ";\n")
+		self.append_code(register_type_qualifier.emit_declaration(register_symbol) + ";\n")
 		return register_symbol
 
 	def analyze_function_structure(self):
@@ -143,18 +162,6 @@ class node_function (function_base):
 		self.analyze_block_structure(self.statements)
 		print self.name + " - structure analysis complete"
 
-	def analyze_signature(self):
-		for arg in self.parameter_list:
-			arg.member.assign_qualified_type(self)
-		if self.return_type is None:
-			self.return_type_qualifier = kt_globals.current_facet.type_dictionary.builtin_type_qualifier_none
-		else:
-			self.return_type.resolve(self)
-			self.return_type_qualifier = self.return_type.qualified_type
-
-		arg_type_qualifier_list = [arg.member.qualified_type for arg in self.parameter_list]
-		self.qualified_type = kt_globals.current_facet.type_dictionary.get_type_function(arg_type_qualifier_list, self.return_type_qualifier)
-
 	def analyze_types(self):
 		if self.types_analyzed:
 			return
@@ -175,21 +182,24 @@ class node_function (function_base):
 			stmt.analyze_stmt_types(self)
 
 	def append_code(self, the_string):
-		self.code += the_string
+		self.facet.emit_code(the_string)
+
 	def append_type_conversion(self, source_symbol, source_type, destination_symbol, destination_type):
 		# TODO: put in actual type conversion code
 		self.append_code(destination_symbol + " = " + source_symbol + ";\n")
 
 	def compile_function(self):
 		self.code = ""
-		return_type_name = self.return_type.get_c_typename()
-		append_code(return_type_name + " " + self.name + "(" + ", ".join(arg.type_spec.emit_declaration(arg.name) for arg in self.parameter_list) + ")\n{\n")
+		return_type_name = self.return_type_qualifier.c_name
+		self.append_code(return_type_name + " " + self.name + "(" + ", ".join(arg.member.qualified_type.emit_declaration(arg.name) for arg in self.parameter_list) + ")\n{\n")
+		for member in self.symbols.values():
+			self.append_code(member.qualified_type.emit_declaration(member.name) + ";\n")
 		self.compile_block(self.statements, 0, 0)
-		append_code("}\n")
+		self.append_code("}\n")
 
 		# now emit the child functions
-		for child in self.child_functions:
-			append_code(child.function_decl.compile_function())
+		#for child in self.child_functions:
+		#	append_code(child.function_decl.compile_function())
 
 		return self.code
 
@@ -201,8 +211,8 @@ class node_function_declaration_stmt(node_function):
 	def analyze_stmt_structure(self, func):
 		func_name = self.name
 		func.add_child_function(self)
-	def analyze_stmt_types(self, func):
-		pass
+	def analyze_stmt_types(self, func): pass
+	def compile(self, func, continue_label_id, break_label_id): pass
 
 class node_function_expr(node_function):
 	def __init__(self):
@@ -219,7 +229,6 @@ class node_function_expr(node_function):
 
 	def analyze_expr_types(self, func, type_qual):
 		self.signature_type_qualifier.check_conversion(type_qual)
-
 
 	def compile(self, func, valid_types):
 		return 'load_sub_function', self.result_register, self

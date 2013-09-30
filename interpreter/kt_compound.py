@@ -188,19 +188,17 @@ class compound_node (program_node):
 	def get_c_name(self):
 		compound_list = self.get_compound_list()
 
-	def emit_classdef(self):
+	def emit_classdef(self, facet):
 		parent_string = " : " + self.parent_node.get_c_classname() if self.parent_node is not None else ""
-		emit_string = "struct " + self.get_c_classname() + parent_string + " {\n"
+		facet.emit_code( "struct " + self.get_c_classname() + parent_string + " {\n")
 		for member in self.members.values():
-			print(member.name)
+			facet.emit_code("//" + member.name + "\n")
 			if member.initial_node == self:
-				if member.type == slot.variable_slot:
-					emit_string += member.type_decl.get_c_type_string() + " " + member.name + ";\n"
-				elif member.type == slot.function_slot:
-					emit_string += member.function_decl.compile_function()
+				if member.member_type == compound_member_types.slot:
+					facet.emit_code(member.type_decl.get_c_type_string() + " " + member.name + ";\n")
+				elif member.member_type == compound_member_types.function:
+					member.function_decl.compile_function()
 		if self.constructor_decl is not None:
-			emit_string += self.constructor_decl.compile_function()
-
-		emit_string += "};\n"
-		return emit_string
+			self.constructor_decl.compile_function()
+		facet.emit_code("};\n")
 

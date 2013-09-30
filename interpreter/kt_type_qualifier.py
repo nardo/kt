@@ -16,7 +16,8 @@ class type_qualifier:
 		self.id = -1
 		self.type_kind = kind
 		self.return_type = None
-		self.parameter_type_list = ()
+		self.is_callable = False
+		self.parameter_type_list = None
 		self.compound = None
 		self.is_numeric = False
 		self.is_integer = False
@@ -27,6 +28,8 @@ class type_qualifier:
 		self.container_key_type = None # the type specifier of keys that index this container
 		self.container_value_type = None # the type specifier of values in this container
 		self.container_size = -1
+		self.c_name = "<invalid type>"
+
 	def get_type_string(self):
 		if self.type_kind == type_qualifier.kind.none_type:
 			return "N"
@@ -46,18 +49,16 @@ class type_qualifier:
 		return self.type_kind
 	def resolve(self, scope):
 		pass
-	def emit_declaration(self, var_name_str):
-		return "variable " + var_name_str
-	def get_c_typename(self):
-		return "variable"
+	def emit_declaration(self, name):
+		return self.c_name + " " + name
 	def check_conversion(self, type_qualifier):
 		# raises a compile error if self cannot be converted to the specified type
 		return None
 	def is_equivalent(self, type_spec):
 		# returns True if the types are fundamentally the same
-		return False
-	def is_callable(self):
-		return False
+		return self.id == type_spec.id
+	def is_none(self):
+		return self.type_kind == type_qualifier.kind.none_type
 	def get_callable_return_type(self):
 		return self.return_type
 	def callable_has_signature(self):
@@ -92,8 +93,10 @@ class type_dictionary:
 		var_type.is_string = True
 		var_type.is_numeric = True
 		var_type.is_container = True
+		var_type.is_callable = True
 		var_type.container_key_type = var_type
 		var_type.container_value_type = var_type
+		var_type.return_type = var_type
 
 	def get_type_none(self):
 		q = type_qualifier(type_qualifier.kind.none_type)
@@ -121,6 +124,7 @@ class type_dictionary:
 		q = type_qualifier(type_qualifier.kind.function_type)
 		q.parameter_type_list = arg_list
 		q.return_type = return_type
+		q.is_callable = True
 		return self.add_type(q)
 
 	def add_type(self, q):

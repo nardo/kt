@@ -49,9 +49,9 @@ class node_return_stmt(program_node):
 	def compile(self, func, continue_label_id, break_label_id):
 		if self.return_expression is None:
 			func.append_code("return;\n")
-
-		returned_symbol = self.return_expression.compile(func, None, func.return_type)
-		func.append_code("return " + returned_symbol + ";\n")
+		else:
+			returned_symbol = self.return_expression.compile(func, None, func.return_type_qualifier)
+			func.append_code("return " + returned_symbol + ";\n")
 
 class node_switch_stmt(program_node):
 	def __init__(self):
@@ -128,7 +128,7 @@ class node_if_stmt(program_node):
 
 	def compile(self, func, continue_label_id, break_label_id):
 		else_block_label_id = func.get_next_label_id()
-		symbol = self.test_expression.compile(None, func.facet.builtin_type_qualifier_boolean)
+		symbol = self.test_expression.compile(func, None, func.facet.type_dictionary.builtin_type_qualifier_boolean)
 		func.append_code("if(!" + symbol + ") " + goto_label(else_block_label_id))
 		func.compile_block(self.if_block, continue_label_id, break_label_id)
 		if(self.else_block is not None):
@@ -224,7 +224,7 @@ class node_for_stmt(program_node):
 
 	def compile(self, func, continue_label_id, break_label_id):
 		if 'init_expression' in self.__dict__:
-			self.init_expression.compile(func, None, func.facet.builtin_type_spec_none)
+			self.init_expression.compile(func, None, func.facet.type_dictionary.builtin_type_qualifier_none)
 		start_loop_label_id = func.get_next_label_id()
 		break_label_id = func.get_next_label_id()
 		if self.end_loop_expression is not None:
@@ -232,12 +232,12 @@ class node_for_stmt(program_node):
 		else:
 			continue_label_id = start_loop_label_id
 		func.append_code(label(start_loop_label_id))
-		test_symbol = self.test_expression.compile(func, None, func.facet.builtin_type_spec_boolean)
+		test_symbol = self.test_expression.compile(func, None, func.facet.type_dictionary.builtin_type_qualifier_boolean)
 		func.append_code("if(!" + test_symbol + ") " + goto_label(break_label_id))
 		func.compile_block(self.statement_list, continue_label_id, break_label_id)
 		if self.end_loop_expression is not None:
 			func.append_code(label(continue_label_id))
-			self.end_loop_expression.compile(func, None, func.facet.builtin_type_spec_none)
+			self.end_loop_expression.compile(func, None, func.facet.type_dictionary.builtin_type_qualifier_none)
 		func.append_code(goto_label(start_loop_label_id) + label(break_label_id))
 
 class node_expression_stmt(program_node):
@@ -252,7 +252,7 @@ class node_expression_stmt(program_node):
 		self.expr.analyze_expr_types(func, func.facet.type_dictionary.builtin_type_qualifier_none)
 
 	def compile(self, func, continue_label_id, break_label_id):
-		self.expr.compile(func, None, func.facet.builtin_type_qualifier_none)
+		self.expr.compile(func, None, func.facet.type_dictionary.builtin_type_qualifier_none)
 
 # initializer_stmt's are generated for constructors
 class node_initializer_stmt(program_node):
