@@ -31,7 +31,7 @@ def resolve_locator(enclosing_scope, locator_name, program_node):
 				location.c_name = locator_name
 			else:
 				location.locator_type = locator_types.child_function
-				location.c_name = location.compound_member.function_decl.get_c_name()
+				location.c_name = location.compound_member.function_decl.c_name
 			return location
 		elif enclosing_scope.prev_scope and locator_name in enclosing_scope.prev_scope.symbols:
 			location.compound_member = enclosing_scope.prev_scope.symbols[locator_name]
@@ -51,7 +51,7 @@ def resolve_locator(enclosing_scope, locator_name, program_node):
 				location.c_name = "__self_object__->" + locator_name
 			else:
 				location.locator_type = locator_types.method
-				location.c_name = location.compound_member.function_decl.get_c_name()
+				location.c_name = location.compound_member.function_decl.c_name
 			#@else:
 			#	raise compile_error, (enclosing_scope, "member " + locator_name + " cannot be used here.")
 			return location
@@ -84,7 +84,7 @@ def resolve_locator(enclosing_scope, locator_name, program_node):
 	elif node.type == "builtin_function":
 		location.locator_type = locator_types.builtin_function
 		location.node = node
-		location.c_name = node.get_c_name()
+		location.c_name = node.c_name
 	else:
 		raise compile_error, (program_node, "global node " + locator_name + " cannot be used as a locator.")
 	return location

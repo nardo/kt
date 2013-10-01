@@ -23,6 +23,9 @@ class node_variable_declaration_stmt(program_node):
 		self.assign_stmt = None
 
 	def analyze_stmt_structure(self, func):
+		pass
+
+	def analyze_stmt_linkage(self, func):
 		func.add_local_variable(self, self.name, self.type_spec)
 		# if the statement has an assignment expression, generate an assignment statement for the assignment
 		if self.assign_expr is not None:
@@ -32,7 +35,7 @@ class node_variable_declaration_stmt(program_node):
 			self.assign_stmt.expr.left.string = self.name
 			self.assign_stmt.expr.right = self.assign_expr
 			#print "  Adding assignment statement: " + str(assign_stmt)
-			self.assign_stmt.analyze_stmt_structure(func)
+			self.assign_stmt.analyze_stmt_linkage(func)
 
 	def analyze_stmt_types(self, func):
 		if self.assign_stmt is not None:

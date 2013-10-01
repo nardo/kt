@@ -196,8 +196,8 @@ class compound_node (program_node):
 			if member.initial_node == self:
 				if member.member_type == compound_member_types.slot:
 					facet.emit_code(member.type_decl.get_c_type_string() + " " + member.name + ";\n")
-				elif member.member_type == compound_member_types.function:
-					member.function_decl.compile_function()
+				#elif member.member_type == compound_member_types.function:
+				#	member.function_decl.compile_function()
 		if self.constructor_decl is not None:
 			self.constructor_decl.compile_function()
 		facet.emit_code("};\n")

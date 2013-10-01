@@ -30,7 +30,7 @@ class node_locator_expr(node_expression):
 		self.string = None
 		self.c_name = None
 
-	def analyze_expr_structure(self, func):
+	def analyze_expr_linkage(self, func):
 		self.location = resolve_locator(func, self.string, self)
 
 	def get_preferred_type_qualifier(self, func):
@@ -67,7 +67,7 @@ class node_int_constant_expr(node_expression):
 	def analyze_expr_types(self, func, result_type_qualifier):
 		if not result_type_qualifier.is_numeric:
 			raise compile_error, (self, "integer constant expression is not valid here.")
-	def analyze_expr_structure(self, func): pass
+	def analyze_expr_linkage(self, func): pass
 	def compile(self, func, result_symbol, type_spec):
 		if result_symbol is None:
 			result_symbol = func.add_register(type_spec)
@@ -100,7 +100,7 @@ class node_string_constant(node_expression):
 		if not result_type_qualifier.is_string:
 			raise compile_error, (self, "string constant expression is not valid here.")
 		self.string_index = func.facet.add_string_constant(self.value)
-	def analyze_expr_structure(self, func): pass
+	def analyze_expr_linkage(self, func): pass
 	def get_preferred_type_qualifier(self, func):
 		return func.facet.type_dictionary.builtin_type_qualifier_string
 	def compile(self, func, result_symbol, type_spec):
@@ -120,9 +120,9 @@ class node_strcat_expr(node_expression):
 		if self.op not in node_strcat_expr.op_table:
 			raise compile_error, (self, "Unknown string cat operator" + str(self.op))
 		return node_strcat_expr.op_table[self.op]
-	def analyze_expr_structure(self, func):
-		self.left.analyze_expr_structure(func)
-		self.right.analyze_expr_structure(func)
+	def analyze_expr_linkage(self, func):
+		self.left.analyze_expr_linkage(func)
+		self.right.analyze_expr_linkage(func)
 	def analyze_expr_types(self, func, result_type_qualifier):
 		func.facet.type_dictionary.builtin_type_qualifier_string.check_conversion(result_type_qualifier)
 		self.left.analyze_expr_types(func, func.facet.type_dictionary.builtin_type_qualifier_string)
@@ -163,9 +163,9 @@ class node_array_index_expr(node_expression):
 		self.resolve(func)
 		return self.container_value_type
 
-	def analyze_expr_structure(self, func):
-		self.array_expr.analyze_expr_structure(func)
-		self.index_expr.analyze_expr_structure(func)
+	def analyze_expr_linkage(self, func):
+		self.array_expr.analyze_expr_linkage(func)
+		self.index_expr.analyze_expr_linkage(func)
 
 	def analyze_expr_types(self, func, result_type_qualifier):
 		self.resolve(func)
@@ -198,10 +198,10 @@ class node_func_call_expr(node_expression):
 		self.func_expr = None
 		self.args = None
 
-	def analyze_expr_structure(self, func):
-		self.func_expr.analyze_expr_structure(func)
+	def analyze_expr_linkage(self, func):
+		self.func_expr.analyze_expr_linkage(func)
 		for arg in self.args:
-			arg.analyze_expr_structure(func)
+			arg.analyze_expr_linkage(func)
 
 	def analyze_expr_types(self, func, result_type_qualifier):
 		func_type = self.func_expr.get_preferred_type_qualifier(func)
@@ -543,9 +543,9 @@ class node_bool_binary_expr(node_expression):
 	def get_preferred_type_qualifier(self, func):
 		return func.facet.type_dictionary.builtin_type_qualifier_boolean
 
-	def analyze_expr_structure(self, func):
-		self.left.analyze_expr_structure(func)
-		self.right.analyze_expr_structure(func)
+	def analyze_expr_linkage(self, func):
+		self.left.analyze_expr_linkage(func)
+		self.right.analyze_expr_linkage(func)
 
 	def analyze_expr_types(self, func, return_type_qualifier):
 		self.operand_type = func.facet.type_dictionary.builtin_type_qualifier_float if self.op[0:7] == "compare" else func.facet.type_dictionary.builtin_type_qualifier_boolean
@@ -608,9 +608,9 @@ class node_assign_expr(node_expression):
 		self.right = None
 	def get_preferred_type_qualifier(self, func):
 		return self.left.get_preferred_type_qualifier(func)
-	def analyze_expr_structure(self, func):
-		self.left.analyze_expr_structure(func)
-		self.right.analyze_expr_structure(func)
+	def analyze_expr_linkage(self, func):
+		self.left.analyze_expr_linkage(func)
+		self.right.analyze_expr_linkage(func)
 	def analyze_expr_types(self, func, result_type_qualifier):
 		self.left.analyze_lvalue(func, result_type_qualifier)
 		left_type_qualifier = self.left.get_preferred_type_qualifier(func)
@@ -639,9 +639,9 @@ class node_float_assign_expr(node_expression):
 	def get_preferred_type_spec(self, func):
 		return self.left.get_preferred_type_spec(func)
 	# left, right, op
-	def analyze_expr_structure(self, func):
-		self.left.analyze_expr_structure(func)
-		self.right.analyze_expr_structure(func)
+	def analyze_expr_linkage(self, func):
+		self.left.analyze_expr_linkage(func)
+		self.right.analyze_expr_linkage(func)
 
 	def analyze_expr_types(self, func, result_type_qualifier):
 		float_type = func.facet.type_dictionary.builtin_type_qualifier_float

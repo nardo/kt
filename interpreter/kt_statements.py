@@ -3,21 +3,22 @@ from kt_expressions import *
 from kt_types import *
 
 class node_continue_stmt(program_node):
-
 	def analyze_stmt_structure(self, func):
 		if func.loop_count == 0:
 			raise compile_error, (self, "continue not allowed outside of a loop.")
+	def analyze_stmt_linkage(self, func):
+		pass
 	def analyze_stmt_types(self, func):
 		pass
-
 	def compile(self, func, continue_label_id, break_label_id):
 		func.append_code(goto_label(continue_label_id))
 
 class node_break_stmt(program_node):
-
 	def analyze_stmt_structure(self, func):
 		if func.loop_count == 0 and func.switch_count == 0:
 			raise compile_error, (self, "break not allowed outside of a loop or switch.")
+	def analyze_stmt_linkage(self, func):
+		pass
 	def analyze_stmt_types(self, func):
 		pass
 
@@ -28,14 +29,15 @@ class node_return_stmt(program_node):
 	def __init__(self):
 		program_node.__init__(self)
 		self.return_expression = None
-
 	def analyze_stmt_structure(self, func):
 		if func.return_type is None:
 			# if there is a return expression the return type is variable - else the return type is empty_type.
 			if self.return_expression is not None:
 				func.return_type = node_locator_type_specifier("variable")
+
+	def analyze_stmt_linkage(self, func):
 		if self.return_expression is not None:
-			self.return_expression.analyze_expr_structure(func)
+			self.return_expression.analyze_expr_linkage(func)
 
 	def analyze_stmt_types(self, func):
 		if func.return_type_qualifier == func.facet.type_dictionary.builtin_type_qualifier_none and self.return_expression is not None:
@@ -65,13 +67,20 @@ class node_switch_stmt(program_node):
 
 	def analyze_stmt_structure(self, func):
 		func.switch_count += 1
-		self.test_expression.analyze_expr_structure(func)
 		for element in self.element_list:
-			for label in element.label_list:
-				label.test_constant.analyze_expr_structure(func)
 			func.analyze_block_structure(element.statement_list)
 		if self.default_block is not None:
 			func.analyze_block_structure(self.default_block)
+		func.switch_count -= 1
+
+	def analyze_stmt_linkage(self, func):
+		self.test_expression.analyze_expr_linkage(func)
+		for element in self.element_list:
+			for label in element.label_list:
+				label.test_constant.analyze_expr_linkage(func)
+			func.analyze_block_linkage(element.statement_list)
+		if self.default_block is not None:
+			func.analyze_block_linkage(self.default_block)
 
 	def analyze_stmt_types(self, func):
 		# save the expression result in a register
@@ -83,7 +92,6 @@ class node_switch_stmt(program_node):
 			func.analyze_block_types(element.statement_list)
 		if self.default_block is not None:
 			func.analyze_block_types(self.default_block)
-		func.switch_count -= 1
 
 	def compile(self, func, continue_label_id, break_label_id):
 		test_register = func.alloc_register(self.test_expression_type_qualifier)
@@ -115,10 +123,15 @@ class node_if_stmt(program_node):
 		self.else_block = None
 
 	def analyze_stmt_structure(self, func):
-		self.test_expression.analyze_expr_structure(func)
 		func.analyze_block_structure(self.if_block)
 		if self.else_block is not None:
 			func.analyze_block_structure(self.else_block)
+
+	def analyze_stmt_linkage(self, func):
+		self.test_expression.analyze_expr_linkage(func)
+		func.analyze_block_linkage(self.if_block)
+		if self.else_block is not None:
+			func.analyze_block_linkage(self.else_block)
 
 	def analyze_stmt_types(self, func):
 		self.test_expression.analyze_expr_types(func, func.facet.type_dictionary.builtin_type_qualifier_boolean)
@@ -147,9 +160,12 @@ class node_while_stmt(program_node):
 
 	def analyze_stmt_structure(self, func):
 		func.loop_count += 1
-		self.test_expression.analyze_expr_structure(func)
 		func.analyze_block_structure(self.statement_list)
 		func.loop_count -= 1
+
+	def analyze_stmt_linkage(self, func):
+		self.test_expression.analyze_expr_linkage(func)
+		func.analyze_block_linkage(self.statement_list)
 
 	def analyze_stmt_types(self, func):
 		self.test_expression.analyze_expr_types(func, func.facet.builtin_type_qualifier_boolean)
@@ -173,8 +189,11 @@ class node_do_while_stmt(program_node):
 	def analyze_stmt_structure(self, func):
 		func.loop_count += 1
 		func.analyze_block_structure(self.statement_list)
-		self.test_expression.analyze_expr_structure(func)
 		func.loop_count -= 1
+
+	def analyze_stmt_linkage(self, func):
+		func.analyze_block_linkage(self.statement_list)
+		self.test_expression.analyze_expr_linkage(func)
 
 	def analyze_stmt_types(self, func):
 		func.analyze_block_types(self.statement_list)
@@ -203,15 +222,19 @@ class node_for_stmt(program_node):
 	def analyze_stmt_structure(self, func):
 		#print "for stmt" + str(stmt)
 		func.loop_count += 1
+		func.analyze_block_structure(self.statement_list)
+		func.loop_count -= 1
+
+	def analyze_stmt_linkage(self, func):
+		#print "for stmt" + str(stmt)
 		if self.variable_initializer is not None:
 			func.add_local_variable(self, self.variable_initializer, self.variable_type_spec)
 		if self.init_expression is not None:
-			self.init_expression.analyze_expr_structure(func)
+			self.init_expression.analyze_expr_linkage(func)
 		if self.end_loop_expression is not None:
-			self.end_loop_expression.analyze_expr_structure(func)
-		self.test_expression.analyze_expr_structure(func)
-		func.analyze_block_structure(self.statement_list)
-		func.loop_count -= 1
+			self.end_loop_expression.analyze_expr_linkage(func)
+		self.test_expression.analyze_expr_linkage(func)
+		func.analyze_block_linkage(self.statement_list)
 
 	def analyze_stmt_types(self, func):
 		#print "for stmt" + str(stmt)
@@ -246,7 +269,10 @@ class node_expression_stmt(program_node):
 		self.expr = None
 
 	def analyze_stmt_structure(self, func):
-		self.expr.analyze_expr_structure(func)
+		pass
+
+	def analyze_stmt_linkage(self, func):
+		self.expr.analyze_expr_linkage(func)
 
 	def analyze_stmt_types(self, func):
 		self.expr.analyze_expr_types(func, func.facet.type_dictionary.builtin_type_qualifier_none)
@@ -261,7 +287,10 @@ class node_initializer_stmt(program_node):
 		self.slot_assignment = None
 		self.slot = None
 
-	def analyze_structure(self, func):
+	def analyze_stmt_structure(self, func):
+		pass
+
+	def analyze_linkage(self, func):
 		# verify that self.slot_assignment.name is in the current compound
 		self.slot = None #FIXME
 		self.slot_assignment.assign_expr.analyze_structure(func)

@@ -19,12 +19,18 @@ class function_base (program_node):
 		self.qualified_type = None
 		self.return_type_qualifier = None
 		self.prev_scope = None
+		self.name = None
+		self.c_name = None
 
 	def is_function(self):
 		return True
 
 	def analyze_signature(self):
 		enclosing_scope = self.compound if self.compound is not None else self.prev_scope
+		if self.prev_scope is None:
+			self.c_name = self.name
+		else:
+			self.c_name = self.prev_scope.c_name + "__X__" + self.name
 
 		for arg in self.parameter_list:
 			if arg.type_spec == None:
@@ -43,8 +49,7 @@ class function_base (program_node):
 
 
 class node_builtin_function(function_base):
-	def get_c_name(self):
-		return self.name
+	pass
 
 class node_builtin_method(function_base):
 	pass
@@ -57,7 +62,6 @@ class node_function (function_base):
 
 	def __init__(self):
 		function_base.__init__(self)
-		self.name = None
 		self.statements = None
 
 		self.compiled_statements = ""
@@ -87,12 +91,6 @@ class node_function (function_base):
 
 	def get_type_signature(self):
 		return None
-
-	def get_c_name(self):
-		if self.prev_scope is None:
-			return self.name
-		else:
-			return self.prev_scope.get_c_name() + "__X__" + self.name
 
 	def __str__(self):
 		ret = "Arg Count " + str(self.arg_count) + " Local Count " + str(self.local_variable_count) + " Register Count " + str(self.register_count) + "\n"
@@ -141,11 +139,16 @@ class node_function (function_base):
 		return register_symbol
 
 	def analyze_function_structure(self):
-		if self.structure_analyzed:
-			return
-		self.structure_analyzed = True
-
 		print "..analyzing function structure of " + self.name
+		if len(self.statements) == 0 or self.statements[-1].__class__ is not node_return_stmt:
+			return_stmt_decl = node_return_stmt()
+			return_stmt_decl.return_expression_list = []
+			self.statements.append(return_stmt_decl)
+		self.analyze_block_structure(self.statements)
+		print self.name + " - structure analysis complete"
+
+	def analyze_function_linkage(self):
+		print "..analyzing function linkage of " + self.name
 		return_stmt_decl = None
 		for arg in self.parameter_list:
 			if arg.name in self.symbols:
@@ -154,13 +157,9 @@ class node_function (function_base):
 			self.symbols[arg.name] = arg.member
 			self.arg_count += 1
 			#print "Arg: " + arg
-		if len(self.statements) == 0 or self.statements[-1].__class__ is not node_return_stmt:
-			return_stmt_decl = node_return_stmt()
-			return_stmt_decl.return_expression_list = []
-			self.statements.append(return_stmt_decl)
 
-		self.analyze_block_structure(self.statements)
-		print self.name + " - structure analysis complete"
+		self.analyze_block_linkage(self.statements)
+		print self.name + " - linkage analysis complete"
 
 	def analyze_types(self):
 		if self.types_analyzed:
@@ -172,6 +171,10 @@ class node_function (function_base):
 		print "..analyzing types of function " + self.name
 		self.analyze_block_types(self.statements)
 		print self.name + " - types analysis complete"
+
+	def analyze_block_linkage(self, statement_list):
+		for stmt in statement_list:
+			stmt.analyze_stmt_linkage(self)
 
 	def analyze_block_structure(self, statement_list):
 		for stmt in statement_list:
@@ -189,19 +192,23 @@ class node_function (function_base):
 		self.append_code(destination_symbol + " = " + source_symbol + ";\n")
 
 	def compile_function(self):
-		self.code = ""
-		return_type_name = self.return_type_qualifier.c_name
-		self.append_code(return_type_name + " " + self.name + "(" + ", ".join(arg.member.qualified_type.emit_declaration(arg.name) for arg in self.parameter_list) + ")\n{\n")
+		self.append_code("struct __args__" + self.c_name + " {\n")
+		for arg in self.parameter_list:
+			self.append_code(arg.member.qualified_type.emit_declaration(arg.name) + ";\n")
+		self.append_code("};\n")
+		self.append_code("struct __frame__" + self.c_name + " {\n")
 		for member in self.symbols.values():
 			self.append_code(member.qualified_type.emit_declaration(member.name) + ";\n")
+		# " + ", ".join(arg.member.qualified_type.emit_declaration(arg.name) for arg in self.parameter_list
+		self.append_code("};\n")
+
+		return_type_name = self.return_type_qualifier.c_name
+		self.append_code(return_type_name + " " + self.c_name + "(__args__" + self.c_name + " *args)\n{\n")
+		self.append_code("__frame__" + self.c_name + " frame;\n")
+		#for member in self.symbols.values():
+		#	self.append_code(member.qualified_type.emit_declaration(member.name) + ";\n")
 		self.compile_block(self.statements, 0, 0)
 		self.append_code("}\n")
-
-		# now emit the child functions
-		#for child in self.child_functions:
-		#	append_code(child.function_decl.compile_function())
-
-		return self.code
 
 	def compile_block(self, statement_list, continue_label_id, break_label_id):
 		for stmt in statement_list:
@@ -211,6 +218,8 @@ class node_function_declaration_stmt(node_function):
 	def analyze_stmt_structure(self, func):
 		func_name = self.name
 		func.add_child_function(self)
+	def analyze_stmt_linkage(self, func):
+		pass
 	def analyze_stmt_types(self, func): pass
 	def compile(self, func, continue_label_id, break_label_id): pass
 
@@ -226,6 +235,8 @@ class node_function_expr(node_function):
 		return_stmt.return_expression_list = (self.expr,)
 		self.statements = [return_stmt]
 		func.add_child_function(self)
+	def analyze_expr_linkage(self, func):
+		pass
 
 	def analyze_expr_types(self, func, type_qual):
 		self.signature_type_qualifier.check_conversion(type_qual)

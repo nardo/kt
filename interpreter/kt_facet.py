@@ -110,15 +110,13 @@ class facet:
 			c.analyze_compound_structure(self)
 		sys.stdout.flush()
 
-		print "Analyzing Function Structures"
-		for func in self.functions:
-			func.analyze_function_structure()
-		sys.stdout.flush()
-		sys.stderr.flush()
-
 		print "Assigning Compound Types"
 		for c in self.sorted_compounds:
 			c.assign_qualified_type(self)
+
+		print "Analyzing Function Structure"
+		for func in self.functions:
+			func.analyze_function_structure()
 
 		print "Analyzing Function Signatures"
 		for func in self.functions:
@@ -129,6 +127,12 @@ class facet:
 		print "Analyzing Compound Member Types"
 		for c in self.sorted_compounds:
 			c.analyze_compound_types(self)
+
+		print "Analyzing Function Linkage"
+		for func in self.functions:
+			func.analyze_function_linkage()
+		sys.stdout.flush()
+		sys.stderr.flush()
 
 		print "Analyzing Function Types"
 		for func in self.functions:

@@ -3,6 +3,7 @@ __author__ = 'markf'
 # general error exception thrown by the compiler if given incorrect input
 class compile_error:
 	def __init__(self, node_where, error_string):
+		print error_string
 		self.fail = self.foo
 		self.node_where = node_where
 		self.error_string = error_string
