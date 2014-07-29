@@ -21,16 +21,23 @@ class function_base (program_node):
 		self.prev_scope = None
 		self.name = None
 		self.c_name = None
+		self.needs_closure = False
 
 	def is_function(self):
 		return True
 
-	def analyze_signature(self):
-		enclosing_scope = self.compound if self.compound is not None else self.prev_scope
+	def resolve_c_name(self):
 		if self.prev_scope is None:
 			self.c_name = self.name
 		else:
 			self.c_name = self.prev_scope.c_name + "__X__" + self.name
+
+	def get_closure_struct_name(self):
+		return "__closure__" + self.c_name
+
+	def analyze_signature_types(self):
+		print "Analyzing signature of " + self.name
+		enclosing_scope = self.compound if self.compound is not None else self.prev_scope
 
 		for arg in self.parameter_list:
 			if arg.type_spec == None:
@@ -45,7 +52,7 @@ class function_base (program_node):
 			self.return_type_qualifier = self.return_type.qualified_type
 
 		arg_type_qualifier_list = [arg.qualified_type for arg in self.parameter_list]
-		self.qualified_type = kt_globals.current_facet.type_dictionary.get_type_function(arg_type_qualifier_list, self.return_type_qualifier)
+		self.qualified_type = kt_globals.current_facet.type_dictionary.get_type_function(arg_type_qualifier_list, self.return_type_qualifier, self.needs_closure)
 
 
 class node_builtin_function(function_base):
@@ -73,8 +80,7 @@ class node_function (function_base):
 		self.switch_count = 0
 		self.register_count = 0
 		self.local_variable_count = 0
-		self.needs_prev_scope = False
-		self.scope_needed = False
+		self.has_closure = False
 		self.symbols = {}
 		self.registers_by_type_id = {}
 		self.child_functions = []
@@ -153,7 +159,7 @@ class node_function (function_base):
 		for arg in self.parameter_list:
 			if arg.name in self.symbols:
 				raise compile_error, (self, "Argument " + arg.name + " is declared more than once.")
-			arg.member = compound_member(self, compound_member_types.slot, arg.name, self.arg_count, arg.type_spec)
+			arg.member = compound_member(self, compound_member_types.parameter, arg.name, self.arg_count, arg.type_spec)
 			self.symbols[arg.name] = arg.member
 			self.arg_count += 1
 			#print "Arg: " + arg
@@ -192,19 +198,27 @@ class node_function (function_base):
 		self.append_code(destination_symbol + " = " + source_symbol + ";\n")
 
 	def compile_function(self):
-		self.append_code("struct __args__" + self.c_name + " {\n")
-		for arg in self.parameter_list:
-			self.append_code(arg.member.qualified_type.emit_declaration(arg.name) + ";\n")
-		self.append_code("};\n")
-		self.append_code("struct __frame__" + self.c_name + " {\n")
-		for member in self.symbols.values():
-			self.append_code(member.qualified_type.emit_declaration(member.name) + ";\n")
-		# " + ", ".join(arg.member.qualified_type.emit_declaration(arg.name) for arg in self.parameter_list
-		self.append_code("};\n")
-
+		if self.has_closure:
+			self.append_code("struct " + self.get_closure_struct_name() + " {\n")
+			for member in self.symbols.values():
+				if member.in_closure:
+					self.append_code(member.qualified_type.emit_declaration(member.name) + ";\n")
+			self.append_code("};\n")
 		return_type_name = self.return_type_qualifier.c_name
-		self.append_code(return_type_name + " " + self.c_name + "(__args__" + self.c_name + " *args)\n{\n")
-		self.append_code("__frame__" + self.c_name + " frame;\n")
+		self.append_code(return_type_name + " " + self.c_name + "(")
+		if self.needs_closure:
+			self.append_code(self.prev_scope.get_closure_struct_name() + " *__closure__" + ("," if len(self.parameter_list) > 0 else ""))
+		self.append_code(",".join(arg.qualified_type.emit_declaration(arg.name) for arg in self.parameter_list) + ")\n{\n")
+		if self.has_closure:
+			self.append_code(self.get_closure_struct_name() + " __self_closure__;\n")
+		for member in self.symbols.values():
+			if member.member_type == compound_member_types.slot and not member.in_closure:
+				self.append_code(member.qualified_type.emit_declaration(member.name) + ";\n")
+
+		for member in self.symbols.values():
+			if member.member_type == compound_member_types.parameter and member.in_closure:
+				self.append_code("__self_closure__." + member.name + " = " + member.name + ";\n")
+
 		#for member in self.symbols.values():
 		#	self.append_code(member.qualified_type.emit_declaration(member.name) + ";\n")
 		self.compile_block(self.statements, 0, 0)

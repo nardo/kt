@@ -18,6 +18,8 @@ class type_qualifier:
 		self.return_type = None
 		self.is_callable = False
 		self.parameter_type_list = None
+		self.is_builtin = False
+		self.needs_closure = False
 		self.compound = None
 		self.is_numeric = False
 		self.is_integer = False
@@ -40,7 +42,7 @@ class type_qualifier:
 		elif self.type_kind >= type_qualifier.kind.class_type and self.kind <= type_qualifier.kind.record_instance_type:
 			return "R" + str(self.kind) + "_" + str(self.compound.compound_id)
 		elif self.type_kind == type_qualifier.kind.function_type:
-			return "F(" + ",".join(x.get_type_string() for x in self.parameter_type_list) + ")->(" + self.return_type.get_type_string() + ")"
+			return "F(" + ("C" if self.needs_closure else "N") + "," + "," + ",".join(x.get_type_string() for x in self.parameter_type_list) + ")->(" + self.return_type.get_type_string() + ")"
 		elif self.type_kind == type_qualifier.kind.array_type:
 			return "A[" + self.container_key_type.get_type_string() + "," + self.container_value_type.get_type_string() + "," + self.container_size + "]"
 		elif self.type_kind == type_qualifier.kind.map_type:
@@ -120,11 +122,13 @@ class type_dictionary:
 		q.compound = the_compound
 		return self.add_type(q)
 
-	def get_type_function(self, arg_list, return_type):
+	def get_type_function(self, arg_list, return_type, needs_closure):
 		q = type_qualifier(type_qualifier.kind.function_type)
 		q.parameter_type_list = arg_list
 		q.return_type = return_type
 		q.is_callable = True
+		#q.is_builtin = is_builtin
+		q.needs_closure = needs_closure
 		return self.add_type(q)
 
 	def add_type(self, q):

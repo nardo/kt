@@ -380,6 +380,7 @@ COMMENT		"//"[^\n\r]*
 \'(\\.|[^/\\'\n\r])*\'	{ scan_string(1, yyleng - 1, true); return IDENTIFIER; } 
 \'{PATH_IDENT}\'		{ scan_string(1, yyleng - 1, false); return PATH; };
 
+"->"	return opARROW;
 "=="	return opEQ;
 "$="	return opEQ;
 "!="	return opNE;

@@ -118,19 +118,25 @@ class facet:
 		for func in self.functions:
 			func.analyze_function_structure()
 
+		for func in self.functions:
+			func.resolve_c_name()
+		for f in (x for x in self.globals_list if x.__class__ == node_builtin_function):
+			f.resolve_c_name()
+
+		print "Analyzing Function Linkage"
+		for func in self.functions:
+			func.analyze_function_linkage()
+
 		print "Analyzing Function Signatures"
 		for func in self.functions:
-			func.analyze_signature()
+			func.analyze_signature_types()
 		for f in (x for x in self.globals_list if x.__class__ == node_builtin_function):
-			f.analyze_signature()
+			f.analyze_signature_types()
 
 		print "Analyzing Compound Member Types"
 		for c in self.sorted_compounds:
 			c.analyze_compound_types(self)
 
-		print "Analyzing Function Linkage"
-		for func in self.functions:
-			func.analyze_function_linkage()
 		sys.stdout.flush()
 		sys.stderr.flush()
 

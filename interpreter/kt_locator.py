@@ -29,6 +29,9 @@ def resolve_locator(enclosing_scope, locator_name, program_node):
 			if location.compound_member.member_type == compound_member_types.slot:
 				location.locator_type = locator_types.local_variable
 				location.c_name = locator_name
+			elif location.compound_member.member_type == compound_member_types.parameter:
+				location.locator_type = locator_types.local_parameter
+				location.c_name = locator_name
 			else:
 				location.locator_type = locator_types.child_function
 				location.c_name = location.compound_member.function_decl.c_name
@@ -36,10 +39,17 @@ def resolve_locator(enclosing_scope, locator_name, program_node):
 		elif enclosing_scope.prev_scope and locator_name in enclosing_scope.prev_scope.symbols:
 			location.compound_member = enclosing_scope.prev_scope.symbols[locator_name]
 			if location.compound_member.member_type == compound_member_types.slot:
-				enclosing_scope.needs_prev_scope = True
-				enclosing_scope.prev_scope.scope_needed = True
+				enclosing_scope.needs_closure = True
+				enclosing_scope.prev_scope.has_closure = True
+				location.compound_member.in_closure = True
 				location.locator_type = locator_types.prev_scope_variable
-				location.c_name = "__prev_scope__->" + locator_name
+				location.c_name = "__closure__->" + locator_name
+			elif location.compound_member.member_type == compound_member_types.parameter:
+				enclosing_scope.needs_closure = True
+				enclosing_scope.prev_scope.has_closure = True
+				location.compound_member.in_closure = True
+				location.locator_type = locator_types.prev_scope_parameter
+				location.c_name = "__closure__->" + location.compound_member.name
 			else:
 				location.locator_type = locator_types.prev_scope_child_function
 				location.c_name = location.compound_member.function_decl.get_c_name()

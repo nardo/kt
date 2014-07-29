@@ -5,6 +5,7 @@ import kt_globals
 class compound_member_types:
 	slot = 0
 	function = 1
+	parameter = 2
 
 class compound_member:
 	def __init__(self, initial_node, member_type, name, index, type_spec = None, function_decl = None):
@@ -16,9 +17,10 @@ class compound_member:
 		self.type_spec = type_spec
 		self.assignment = None
 		self.qualified_type = None
+		self.in_closure = False
 
 	def assign_qualified_type(self, the_scope):
-		if self.member_type == compound_member_types.slot:
+		if self.member_type == compound_member_types.slot or self.member_type == compound_member_types.parameter:
 			if self.type_spec == None:
 				self.qualified_type = kt_globals.current_facet.type_dictionary.builtin_type_qualifier_variable
 			else:
@@ -28,7 +30,7 @@ class compound_member:
 			self.qualified_type = self.function_decl.qualified_type
 
 	def is_variable(self):
-		return self.member_type == compound_member_types.slot_member_type
+		return self.member_type == compound_member_types.slot_member_type or self.member_type == compound_member_types.parameter
 	def is_function(self):
 		return self.member_type == compound_member_types.function_member_type
 	def __str__(self):

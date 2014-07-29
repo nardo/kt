@@ -52,7 +52,7 @@ class node_locator_expr(node_expression):
 				return self.location.c_name
 		else:
 			if result_symbol is None:
-				result_symbol = func.add_register(self.location.get_type_qualifier())
+				result_symbol = func.add_register(type_qual)
 			func.append_type_conversion(self.location.c_name, self.location.get_type_qualifier(), result_symbol, type_qual)
 			return result_symbol
 
@@ -115,7 +115,8 @@ class node_strcat_expr(node_expression):
 		self.left = None
 		self.right = None
 		self.op = None
-	op_table = { 'cat_none' : "", 'cat_newline' : "\n", 'cat_space' : " ", 'cat_tab' : "\t" }
+	op_table = { 'cat_none' : "\"\"", 'cat_newline' : "\"\\n\"", 'cat_space' : " ", 'cat_tab' : "\"\\t\"" }
+
 	def get_cat_str(self):
 		if self.op not in node_strcat_expr.op_table:
 			raise compile_error, (self, "Unknown string cat operator" + str(self.op))
@@ -228,22 +229,30 @@ class node_func_call_expr(node_expression):
 	def compile(self, func, result_symbol, type_qual):
 		func_type = self.func_expr.get_preferred_type_qualifier(func)
 		callable_return_type = func_type.get_callable_return_type()
-		if result_symbol is None:
-			result_symbol = func.add_register(type_qual)
-		return_register = result_symbol
-		if not type_qual.is_equivalent(callable_return_type):
-			return_register = func.add_register(callable_return_type)
+		has_return_value = type_qual.type_kind != type_qualifier.kind.none_type
+		return_register = None
+		if has_return_value:
+			if result_symbol is None:
+				result_symbol = func.add_register(type_qual)
+			if callable_return_type.type_kind == type_qualifier.kind.none_type:
+				raise compile_error, (self, "Assigning value from function that returns none.")
+			return_register = result_symbol
+			if not type_qual.is_equivalent(callable_return_type):
+				return_register = func.add_register(callable_return_type)
+
 		func_symbol = self.func_expr.compile(func, None, func_type)
 
 		if func_type.parameter_type_list is not None:
 			# if the callable has a specific signature, we can call its symbol directly
 			arg_symbols = [arg.compile(func, None, type) for arg, type in zip(self.args, func_type.parameter_type_list)]
-			func.append_code(return_register + " = " + func_symbol + "(" + ", ".join(arg_symbols) + ");\n")
+			if has_return_value:
+				func.append_code(return_register + " = ")
+			func.append_code(func_symbol + "(" + ", ".join(arg_symbols) + ");\n")
 		else:
 			# if the signature is unknown, we compile everything into a variable and let the dynamic dispatcher take care of things.
 			arg_symbols = [arg.compile(func, None, func.facet.type_dictionary.builtin_type_qualifier_variable) for arg in self.args]
 			func.append_code("__dynamic_dispatch__(" + func_symbol + ", &" + return_register + ", " + str(len(arg_symbols)) + "".join(", &" + symbol for symbol in arg_symbols))
-		if return_register != result_symbol:
+		if return_register is not None and return_register != result_symbol:
 			func.append_type_conversion(return_register, callable_return_type, result_symbol, type_qual)
 		return result_symbol
 

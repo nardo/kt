@@ -505,7 +505,7 @@ function_declaration
 			field($$, is_public, $1);
 			field($$, is_shared, $2);
 			field($$, parameter_list, $6);
-			field($$, return_type_list, $8);
+			field($$, return_type, $8);
 			field($$, facet_list, $9);
 			field($$, statements, $11);
 		}
@@ -519,7 +519,7 @@ method_declaration
 			field($$, selector_decl_list, $5);
 			field($$, is_public, $1);
 			field($$, is_shared, $2);
-			field($$, return_type_list, $6);
+			field($$, return_type, $6);
 			field($$, facet_list, $7);
 			field($$, statements, $9);
 		}
@@ -530,7 +530,7 @@ method_declaration
 			field($$, selector_decl_list, empty_list());
 			field($$, is_public, $1);
 			field($$, is_shared, $2);
-			field($$, return_type_list, $5);
+			field($$, return_type, $5);
 			field($$, facet_list, $6);
 			field($$, statements, $8);
 		}
@@ -590,7 +590,7 @@ function_declaration_statement
          $$ = node(function_declaration_stmt);
          field($$, name, $2);
          field($$, parameter_list, $4);
-         field($$, return_type_list, $6);
+         field($$, return_type, $6);
          field($$, statements, $8);
       }
 
@@ -1335,7 +1335,7 @@ function_expression
 		{
          $$ = node(function_expr);
          field($$, parameter_list, $3);
-         field($$, return_type_list, $5);
+         field($$, return_type, $5);
          field($$, expr, $7);
       }
 	;

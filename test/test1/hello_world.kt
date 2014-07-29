@@ -1,8 +1,9 @@
-function test_function()
+function test_function(foo)
 	var part1: string = "hello"
 	var part2: string = ", world!"
 
-	function get_letter(index)
+	function get_letter(index: int32) -> int32
+		foo = 10
 		return part2[index]
 	
 	var result = part1
@@ -16,5 +17,5 @@ function test_function()
 	return result
 
 function main()
-	var string = test_function()
-	print(string)
+	var the_string = test_function(11)
+	print(the_string)
