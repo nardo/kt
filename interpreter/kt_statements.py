@@ -1,6 +1,5 @@
 from kt_program_tree import *
 from kt_expressions import *
-from kt_types import *
 
 class node_continue_stmt(program_node):
 	def analyze_stmt_structure(self, func):

@@ -44,7 +44,7 @@ class node_basic_type (type_qualifier):
 
 # a facet in kt defines a full program execution space.
 class facet:
-	def __init__(self, facet_name):
+	def __init__(self, facet_name, output_file):
 		self.string_constants = []
 		self.string_constant_lookup = {}
 		self.facet_name = facet_name
@@ -55,6 +55,7 @@ class facet:
 		self.globals_by_id = []
 		self.type_dictionary = type_dictionary()
 		self.next_label_id = 1
+		self.output_file = output_file
 
 		self.root = node_object()
 		self.root.name = 'Root'
@@ -94,7 +95,7 @@ class facet:
 		self.type_dictionary.builtin_type_qualifier_string.c_name = "string"
 
 		self.find_node(None, "/builtins/variable").qualified_type = self.type_dictionary.builtin_type_qualifier_variable
-		self.type_dictionary.builtin_type_qualifier_variable.c_name = "variable"
+		self.type_dictionary.builtin_type_qualifier_variable.c_name = "kt_program::variable"
 
 		print "Globals: " + str(" ".join(g.name for g in self.globals_list))
 
@@ -157,6 +158,7 @@ class facet:
 		kt_globals.current_facet = None
 
 	def emit_code(self, the_code):
+		self.output_file.write(the_code)
 		sys.stdout.write(the_code)
 		sys.stdout.flush()
 

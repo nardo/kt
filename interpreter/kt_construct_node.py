@@ -1,7 +1,6 @@
 __author__ = 'markf'
 
 from kt_program_tree import *
-from kt_types import *
 from kt_declarations import *
 from kt_functions import *
 from kt_statements import *

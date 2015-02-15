@@ -2,7 +2,6 @@ from kt_slot import *
 import kt_globals
 #from kt_variable import *
 #from kt_functions import *
-from kt_types import *
 from kt_locator_types import *
 from kt_program_tree import *
 

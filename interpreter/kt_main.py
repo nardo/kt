@@ -5,10 +5,11 @@
 #from kt_compiler import *
 from kt_file_tree import *
 from kt_program_tree import *
-from kt_types import *
 from kt_facet import *
 import kt
 import sys
+import subprocess
+
 import traceback
 
 def kt():
@@ -19,12 +20,15 @@ def kt():
 	facets = get_facet_set(file_tree)
 	print "Facets in test program: " + str(facets)
 	sys.stdout.flush()
+	output_file = open(root_tree + "_output.cpp", "w")
 
 	facet_trees = {}
 	for facet_name in facets:
 		print "Processing facet: " + facet_name
-		new_facet = facet(facet_name)
+		new_facet = facet(facet_name, output_file)
 		new_facet.process(file_tree)
+	output_file.close()
+	subprocess.call(["gcc", "-c", root_tree + "_output.cpp", "-I", "../..", "-I", "../standard_library"], stdout=sys.stdout, stderr=sys.stderr)
 	#except compile_error, err:
 	#	traceback.print_exc()
 	#	print "Compile ERROR DUDE!!: " + err.error_string
