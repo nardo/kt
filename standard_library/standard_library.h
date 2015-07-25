@@ -77,6 +77,14 @@ struct kt_program
 
 	context _context;
 	type_database _type_database;
+	static bool convert_int_to_string(string *dest, int32 *source, context *the_context)
+	{
+		char buffer[32];
+		snprintf(buffer, sizeof(buffer), "%d", *source);
+
+		dest->set(buffer);
+		return true;
+	}
 
 	kt_program() : _type_database(&_context)
 	{
@@ -86,6 +94,7 @@ struct kt_program
 		_type_database.add_basic_type("int32", get_global_type_record<int32>());
 		_type_database.add_basic_type("float64", get_global_type_record<float64>());
 		_type_database.add_basic_type("none", get_global_type_record<none>());
+		_type_database.add_type_conversion(&convert_int_to_string, false);
 		_type_database.add_function("print", print);
 		core_type_begin_class(_type_database, object, ref_object, false)
 		core_type_slot(_type_database, object, dummy_field, 0)

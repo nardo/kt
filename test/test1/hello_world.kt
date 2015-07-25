@@ -14,6 +14,7 @@ function test_function(foo)
 		result = result @ get_letter(i)
 		if i > 20
 			break
+	print(foo)
 	return result
 
 function main()
