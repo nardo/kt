@@ -13,10 +13,10 @@ def compiler_warning(node_where, warning_string):
 	print "Warning!: " + warning_string
 
 def goto_label(label_id):
-	return "goto @l" + str(label_id) + ";\n"
+	return "goto _gt_l" + str(label_id) + ";\n"
 
 def label(label_id):
-	return "@l" + str(label_id) + ":\n"
+	return "_gt_l" + str(label_id) + ":\n"
 
 class program_node(object):
 	def __init__(self):

@@ -3,15 +3,32 @@ namespace core
 {
 #include "core/core.h"
 
+static void print(string the_string)
+{
+	printf("%s\n", the_string.c_str());
+}
+
+string _concatenate_string(const string &left, const char *separator, const string &right)
+{
+	string ret;
+	uint32 left_len = left.len();
+	uint32 right_len = right.len();
+	uint32 separator_len = strlen(separator);
+	ret.reserve(left_len + right_len + separator_len);
+	uint8 *dest = ret.data();
+	memcpy(dest, left.data(), left_len);
+	memcpy(dest + left_len, separator, separator_len);
+	memcpy(dest + left_len + separator_len, right.data(), right_len);
+	return ret;
+}
+
 struct kt_program
 {
-	context _context;
-	type_database _type_database;
 	struct object : public ref_object
 	{
 		string dummy_field;
 		int32 dummy_int;
-		
+
 		int32 get_integer()
 		{
 			return dummy_int;
@@ -21,21 +38,46 @@ struct kt_program
 			dummy_field = arg;
 		}
 	};
-	
+
 	struct directory : public object
 	{
-		
+
+	};
+
+	struct none
+	{
+
 	};
 
 	struct variable
 	{
-		char data[16];
+		char data[8];
+		type_record *type;
+
+		variable()
+		{
+			type = get_global_type_record<none>();
+		}
+
+		variable(int32 val)
+		{
+			type = get_global_type_record<int32>();
+			type->numeric_info->from_uint32((void *) data, val);
+		}
+		variable(string &str)
+		{
+			type = get_global_type_record<string>();
+			construct((string *) data, str);
+		}
+		~variable()
+		{
+			type->destroy_object((void *) data);
+		}
 	};
 
-	static void print(string the_string)
-	{
-		printf("%s\n", the_string.c_str());
-	}
+	context _context;
+	type_database _type_database;
+
 	kt_program() : _type_database(&_context)
 	{
 		_type_database.add_basic_type("variable", get_global_type_record<variable>());
@@ -43,7 +85,7 @@ struct kt_program
 		_type_database.add_basic_type("boolean", get_global_type_record<bool>());
 		_type_database.add_basic_type("int32", get_global_type_record<int32>());
 		_type_database.add_basic_type("float64", get_global_type_record<float64>());
-		_type_database.add_basic_type("none", get_global_type_record<empty_type>());
+		_type_database.add_basic_type("none", get_global_type_record<none>());
 		_type_database.add_function("print", print);
 		core_type_begin_class(_type_database, object, ref_object, false)
 		core_type_slot(_type_database, object, dummy_field, 0)
@@ -55,6 +97,33 @@ struct kt_program
 		core_type_end_class(_type_database)
 	}
 };
+
+static kt_program kt;
+
+template<class S, class T> void type_convert(S &s, T t)
+{
+	s = t;
+}
+
+inline void type_convert(string &str, int32 value)
+{
+	string ret_value;
+	char buffer[16];
+	sprintf(buffer, "%d", value);
+	str.set(buffer);
+}
+
+inline void type_convert(kt_program::variable &var, int32 val)
+{
+	var.type->destroy_object((void *) &var);
+	var.type = get_global_type_record<int32>();
+	var.type->numeric_info->from_uint32((void *) var.data, val);
+}
+
+inline void type_convert(string &s, kt_program::variable &var)
+{
+	kt._type_database.type_convert(&s, get_global_type_record<string>(), var.data, var.type);
+}
 
 };
 

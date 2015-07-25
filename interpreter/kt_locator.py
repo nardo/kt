@@ -8,7 +8,6 @@ from kt_program_tree import *
 class resolved_location:
 	def __init__(self):
 		self.locator_type = None
-		self.c_name = None
 		self.compound_member = None
 		self.node = None
 
@@ -17,6 +16,32 @@ class resolved_location:
 			return self.compound_member.qualified_type
 		else:
 			return self.node.qualified_type
+
+	def get_c_name(self):
+		if self.locator_type == locator_types.local_variable or self.locator_type == locator_types.local_parameter:
+			if self.compound_member.in_closure:
+				return "__self_closure__." + self.compound_member.name
+			else:
+				return self.compound_member.name
+		elif self.locator_type == locator_types.child_function or self.locator_type == locator_types.prev_scope_child_function or self.locator_type == locator_types.method:
+			if self.node is not None:
+				return self.node.get_c_name()
+			else:
+				return self.compound_member.function_decl.c_name
+		elif self.locator_type == locator_types.prev_scope_variable or self.locator_type == locator_types.prev_scope_parameter:
+			return "__closure__->" + self.compound_member.name
+		elif self.locator_type == locator_types.instance_variable:
+			if self.node is not None:
+				return self.node.get_c_name() + "." + self.compound_member.name
+			else:
+				return "__self_object__->" + self.compound_member.name
+		elif self.locator_type == locator_types.builtin_type:
+			return self.node.get_c_name()
+		elif self.locator_type == locator_types.builtin_function:
+			return self.node.c_name
+
+
+
 
 def resolve_locator(enclosing_scope, locator_name, program_node):
 	location = resolved_location()
@@ -27,13 +52,10 @@ def resolve_locator(enclosing_scope, locator_name, program_node):
 			location.compound_member = enclosing_scope.symbols[locator_name]
 			if location.compound_member.member_type == compound_member_types.slot:
 				location.locator_type = locator_types.local_variable
-				location.c_name = locator_name
 			elif location.compound_member.member_type == compound_member_types.parameter:
 				location.locator_type = locator_types.local_parameter
-				location.c_name = locator_name
 			else:
 				location.locator_type = locator_types.child_function
-				location.c_name = location.compound_member.function_decl.c_name
 			return location
 		elif enclosing_scope.prev_scope and locator_name in enclosing_scope.prev_scope.symbols:
 			location.compound_member = enclosing_scope.prev_scope.symbols[locator_name]
@@ -42,25 +64,20 @@ def resolve_locator(enclosing_scope, locator_name, program_node):
 				enclosing_scope.prev_scope.has_closure = True
 				location.compound_member.in_closure = True
 				location.locator_type = locator_types.prev_scope_variable
-				location.c_name = "__closure__->" + locator_name
 			elif location.compound_member.member_type == compound_member_types.parameter:
 				enclosing_scope.needs_closure = True
 				enclosing_scope.prev_scope.has_closure = True
 				location.compound_member.in_closure = True
 				location.locator_type = locator_types.prev_scope_parameter
-				location.c_name = "__closure__->" + location.compound_member.name
 			else:
 				location.locator_type = locator_types.prev_scope_child_function
-				location.c_name = location.compound_member.function_decl.get_c_name()
 			return location
 		elif enclosing_compound and locator_name in enclosing_compound.members:
 			location.compound_member = enclosing_compound.members[locator_name]
 			if location.compound_member.member_type == compound_member_types.slot:
 				location.locator_type = locator_types.instance_variable
-				location.c_name = "__self_object__->" + locator_name
 			else:
 				location.locator_type = locator_types.method
-				location.c_name = location.compound_member.function_decl.c_name
 			#@else:
 			#	raise compile_error, (enclosing_scope, "member " + locator_name + " cannot be used here.")
 			return location
@@ -74,26 +91,21 @@ def resolve_locator(enclosing_scope, locator_name, program_node):
 	if node.is_compound():
 		location.locator_type = locator_types.reference
 		location.node = node
-		location.c_name = node.get_c_name()
 	elif node.type == "variable":
 		location.locator_type = locator_types.instance_variable
 		location.node = node.compound
 		location.compound_member = location.node.members.find(node.name)
-		location.c_name = location.node.get_c_name() + "." + node.name
 	elif node.type == "function":
 		location.locator_type = locator_types.method
 		location.node = node.compound
 		location.compound_member = location.node.members.find(node.name)
-		location.c_name = node.get_c_name()
 	elif node.type == "builtin_type":
 		location.locator_type = locator_types.builtin_type
 		location.node = node
-		location.c_name = node.get_c_name()
 		# location.type_specifier = node.get_type_specifier()
 	elif node.type == "builtin_function":
 		location.locator_type = locator_types.builtin_function
 		location.node = node
-		location.c_name = node.c_name
 	else:
 		raise compile_error, (program_node, "global node " + locator_name + " cannot be used as a locator.")
 	return location

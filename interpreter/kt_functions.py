@@ -1,6 +1,7 @@
 from kt_program_tree import *
 from kt_statements import node_return_stmt
 from kt_slot import *
+from kt_type_qualifier import *
 import kt_globals
 
 class node_parameter(program_node):
@@ -63,9 +64,10 @@ class node_builtin_method(function_base):
 
 class node_function (function_base):
 	class register:
-		def __init__(self):
+		def __init__(self, type_qual):
 			self.allocated_count = 0
 			self.in_use = 0
+			self.type_qual = type_qual
 
 	def __init__(self):
 		function_base.__init__(self)
@@ -134,15 +136,16 @@ class node_function (function_base):
 	def add_register(self, register_type_qualifier):
 		type_id = register_type_qualifier.id
 		if type_id not in self.registers_by_type_id:
-			self.registers_by_type_id[type_id] = node_function.register()
+			self.registers_by_type_id[type_id] = node_function.register(register_type_qualifier)
 		register = self.registers_by_type_id[type_id]
-		register.in_use += 1
 		register_symbol = "register_" + str(type_id) + "_" + str(register.in_use)
+		register.in_use += 1
 		if register.in_use <= register.allocated_count:
 			return register_symbol
 		register.allocated_count += 1
-		self.append_code(register_type_qualifier.emit_declaration(register_symbol) + ";\n")
 		return register_symbol
+
+	# registers are allocated during the compile step, but must be declared sequentially before the function's code.
 
 	def analyze_function_structure(self):
 		print "..analyzing function structure of " + self.name
@@ -191,13 +194,14 @@ class node_function (function_base):
 			stmt.analyze_stmt_types(self)
 
 	def append_code(self, the_string):
-		self.facet.emit_code(the_string)
+		self.code += the_string
 
 	def append_type_conversion(self, source_symbol, source_type, destination_symbol, destination_type):
 		# TODO: put in actual type conversion code
-		self.append_code(destination_symbol + " = " + source_symbol + ";\n")
+		self.append_code("type_convert(" + destination_symbol + ", " + source_symbol + ");\n")
 
 	def compile_function(self):
+		self.code = ""
 		if self.has_closure:
 			self.append_code("struct " + self.get_closure_struct_name() + " {\n")
 			for member in self.symbols.values():
@@ -205,7 +209,9 @@ class node_function (function_base):
 					self.append_code(member.qualified_type.emit_declaration(member.name) + ";\n")
 			self.append_code("};\n")
 		return_type_name = self.return_type_qualifier.c_name
-		self.append_code(return_type_name + " " + self.c_name + "(")
+		if self.return_type_qualifier.type_kind == type_qualifier.kind.none_type:
+			return_type_name = "void"
+		self.append_code("static " + return_type_name + " " + self.c_name + "(")
 		if self.needs_closure:
 			self.append_code(self.prev_scope.get_closure_struct_name() + " *__closure__" + ("," if len(self.parameter_list) > 0 else ""))
 		self.append_code(",".join(arg.qualified_type.emit_declaration(arg.name) for arg in self.parameter_list) + ")\n{\n")
@@ -221,8 +227,21 @@ class node_function (function_base):
 
 		#for member in self.symbols.values():
 		#	self.append_code(member.qualified_type.emit_declaration(member.name) + ";\n")
+		self.facet.emit_code(self.code)
+		self.code = ""
 		self.compile_block(self.statements, 0, 0)
 		self.append_code("}\n")
+
+		func_code = self.code
+		self.code = ""
+
+		for id, reg in self.registers_by_type_id.items():
+			for i in range(0, reg.allocated_count):
+				register_symbol = "register_" + str(id) + "_" + str(i)
+				self.append_code(reg.type_qual.emit_declaration(register_symbol) + ";\n")
+
+		self.facet.emit_code(self.code)
+		self.facet.emit_code(func_code)
 
 	def compile_block(self, statement_list, continue_label_id, break_label_id):
 		for stmt in statement_list:

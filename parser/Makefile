@@ -1,7 +1,7 @@
 LEX=/usr/local/bin/flex
 YACC=/usr/local/bin/bison
-CPPFLAGS=-I/usr/include/python2.5 -I../../ -I../standard_library
-LDFLAGS=-lpython2.5 -lstdc++ -framework Foundation
+CPPFLAGS=-I/usr/include/python2.7 -I../../ -I../standard_library
+LDFLAGS=-lpython2.7 -lstdc++ -framework Foundation
 python: main.o parser.o lexical_analyzer.o
 	$(CC) -o $@ $(LDFLAGS) $^
 
@@ -22,3 +22,4 @@ lexical_analyzer.cpp: lexical_analyzer.flex
 
 clean:
 	rm python *.o lexical_analyzer.cpp parser.cpp parser.hpp parser.output
+

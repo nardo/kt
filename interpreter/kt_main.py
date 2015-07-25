@@ -28,7 +28,8 @@ def kt():
 		new_facet = facet(facet_name, output_file)
 		new_facet.process(file_tree)
 	output_file.close()
-	subprocess.call(["gcc", "-c", root_tree + "_output.cpp", "-I", "../..", "-I", "../standard_library"], stdout=sys.stdout, stderr=sys.stderr)
+	subprocess.call(["gcc", "-g", "-o", root_tree + "_output.o", "-c", root_tree + "_output.cpp", "-I", "../..", "-I", "../standard_library"], stdout=sys.stdout, stderr=sys.stderr)
+	subprocess.call(["gcc", "-g", "-o", root_tree + "_out", root_tree + "_output.o", "-lstdc++"], stdout=sys.stdout, stderr=sys.stderr)
 	#except compile_error, err:
 	#	traceback.print_exc()
 	#	print "Compile ERROR DUDE!!: " + err.error_string

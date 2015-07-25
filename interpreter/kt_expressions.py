@@ -28,7 +28,6 @@ class node_locator_expr(node_expression):
 		node_expression.__init__(self)
 		self.location = None
 		self.string = None
-		self.c_name = None
 
 	def analyze_expr_linkage(self, func):
 		self.location = resolve_locator(func, self.string, self)
@@ -46,18 +45,18 @@ class node_locator_expr(node_expression):
 	def compile(self, func, result_symbol, type_qual):
 		if self.location.get_type_qualifier().is_equivalent(type_qual):
 			if result_symbol is not None:
-				func.append_code(result_symbol + " = " + self.location.c_name + ";\n")
+				func.append_code(result_symbol + " = " + self.location.get_c_name() + ";\n")
 				return result_symbol
 			else:
-				return self.location.c_name
+				return self.location.get_c_name()
 		else:
 			if result_symbol is None:
 				result_symbol = func.add_register(type_qual)
-			func.append_type_conversion(self.location.c_name, self.location.get_type_qualifier(), result_symbol, type_qual)
+			func.append_type_conversion(self.location.get_c_name(), self.location.get_type_qualifier(), result_symbol, type_qual)
 			return result_symbol
 
 	def compile_lvalue(self, func):
-		return self.location.c_name, self.location.get_type_qualifier()
+		return self.location.get_c_name(), self.location.get_type_qualifier()
 
 
 class node_int_constant_expr(node_expression):
@@ -67,12 +66,21 @@ class node_int_constant_expr(node_expression):
 	def analyze_expr_types(self, func, result_type_qualifier):
 		if not result_type_qualifier.is_numeric:
 			raise compile_error, (self, "integer constant expression is not valid here.")
+
 	def analyze_expr_linkage(self, func): pass
-	def compile(self, func, result_symbol, type_spec):
-		if result_symbol is None:
-			result_symbol = func.add_register(type_spec)
-		func.append_code(result_symbol + " = " + str(self.value) + ";\n")
-		return result_symbol
+	def compile(self, func, result_symbol, type_qual):
+		if func.facet.type_dictionary.builtin_type_qualifier_integer.is_equivalent(type_qual):
+			if result_symbol is None:
+				result_symbol = func.add_register(type_qual)
+			func.append_code(result_symbol + " = " + str(self.value) + ";\n")
+			return result_symbol
+		else:
+			if result_symbol is None:
+				result_symbol = func.add_register(type_qual)
+			const_reg = func.add_register(func.facet.type_dictionary.builtin_type_qualifier_integer)
+			func.append_code(const_reg + " = " + str(self.value) + ";\n")
+			func.append_type_conversion(const_reg, func.facet.type_dictionary.builtin_type_qualifier_integer, result_symbol, type_qual)
+			return result_symbol
 
 	def get_preferred_type_qualifier(self, func):
 		return func.facet.type_dictionary.builtin_type_qualifier_integer
@@ -132,9 +140,16 @@ class node_strcat_expr(node_expression):
 	def compile(self, func, result_symbol, type_qual):
 		if result_symbol is None:
 			result_symbol = func.add_register(type_qual)
+
+		if func.facet.type_dictionary.builtin_type_qualifier_string.is_equivalent(type_qual):
+			intermediate_result = result_symbol
+		else:
+			intermediate_result = func.add_register(func.facet.type_dictionary.builtin_type_qualifier_string)
 		left_symbol = self.left.compile(func, None, func.facet.type_dictionary.builtin_type_qualifier_string)
 		right_symbol = self.right.compile(func, None, func.facet.type_dictionary.builtin_type_qualifier_string)
-		func.append_code(result_symbol + " = format_string(\"%s%s%s\", " + left_symbol + ", " + self.get_cat_str() + ", " + right_symbol + ");\n")
+		func.append_code(intermediate_result + " = _concatenate_string(" + left_symbol + ", " + self.get_cat_str() + ", " + right_symbol + ");\n")
+		if result_symbol != intermediate_result:
+			func.append_type_conversion(intermediate_result, func.facet.type_dictionary.builtin_type_qualifier_string, result_symbol, type_qual)
 		return result_symbol
 
 	def get_preferred_type_spec(self, func):
@@ -247,7 +262,12 @@ class node_func_call_expr(node_expression):
 			arg_symbols = [arg.compile(func, None, type) for arg, type in zip(self.args, func_type.parameter_type_list)]
 			if has_return_value:
 				func.append_code(return_register + " = ")
-			func.append_code(func_symbol + "(" + ", ".join(arg_symbols) + ");\n")
+			func.append_code(func_symbol + "(")
+			if func_type.needs_closure:
+				func.append_code("&__self_closure__")
+				if(len(arg_symbols) > 0):
+					func.append_code(", ")
+			func.append_code(", ".join(arg_symbols) + ");\n")
 		else:
 			# if the signature is unknown, we compile everything into a variable and let the dynamic dispatcher take care of things.
 			arg_symbols = [arg.compile(func, None, func.facet.type_dictionary.builtin_type_qualifier_variable) for arg in self.args]

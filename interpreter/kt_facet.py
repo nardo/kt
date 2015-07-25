@@ -80,7 +80,7 @@ class facet:
 
 		# set qualifiers for the builtin types
 		self.find_node(None, "/builtins/none").qualified_type = self.type_dictionary.builtin_type_qualifier_none
-		self.type_dictionary.builtin_type_qualifier_none.c_name = "none"
+		self.type_dictionary.builtin_type_qualifier_none.c_name = "kt_program::none"
 
 		self.find_node(None, "/builtins/boolean").qualified_type = self.type_dictionary.builtin_type_qualifier_boolean
 		self.type_dictionary.builtin_type_qualifier_boolean.c_name = "bool"
@@ -149,11 +149,14 @@ class facet:
 		print "Facet compiles to:\n"
 		self.emit_standard_includes()
 		self.emit_code("namespace core {\n")
+		#self.emit_code("static kt_program kt;\n")
 		self.emit_string_table()
 		self.emit_code("struct program {\n")
 		self.emit_classdefs()
 		self.emit_functions()
 		self.emit_code("};\n}\n")
+
+		self.emit_code("int main(int argc, const char **argv) { core::__init_string_constants(); core::program::main(); return 0; } ")
 
 		kt_globals.current_facet = None
 

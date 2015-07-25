@@ -121,8 +121,6 @@ static PyObject *kt_objc_test_py(PyObject *self, PyObject *args)
 	return 0;
 }
 
-core::kt_program the_program;
-
 static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
 {
 	const char *script_data;
@@ -143,7 +141,7 @@ static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
 	parse_node_ptr body = result.add_list(NULL);
 	builtins_node->set_property(&result, "body", body);
 	
-	core::dictionary<core::type_database::type_rep *>::pointer p = the_program._type_database._class_table.first();
+	core::dictionary<core::type_database::type_rep *>::pointer p = core::kt._type_database._class_table.first();
 	while(p)
 	{
 		core::type_database::type_rep *val = *(p.value());
@@ -172,7 +170,7 @@ static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
 			{
 				parse_node_ptr compound_field = result.add_node("builtin_slot");
 				compound_field->set_property(&result, "name", result.add_c_string(fp.value()->name.c_str()));
-				core::type_database::type_rep *field_type = the_program._type_database.find_type(fp.value()->type);
+				core::type_database::type_rep *field_type = core::kt._type_database.find_type(fp.value()->type);
 				if(field_type)
 				{
 					parse_node_ptr type_spec = result.add_node("locator_type_specifier");
@@ -187,27 +185,30 @@ static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
 				core::function_record *func = *(mp.value());
 				parse_node_ptr method_node = result.add_node("builtin_method");
 				method_node->set_property(&result, "name", result.add_c_string(name->c_str()));
+
+				printf("Adding method %s\n", name->c_str());
+
 				parse_node_ptr parameters = result.add_list(NULL);
 				method_node->set_property(&result, "parameter_list", parameters);
 				core::function_type_signature *sig = func->get_signature();
 				for(uint32 i = 0; i < sig->argument_count; i++)
 				{
 					core::type_record *param_type = sig->argument_types[i];
-					core::type_database::type_rep *param_rep = the_program._type_database.find_type(param_type);
-					
+					core::type_database::type_rep *param_rep = core::kt._type_database.find_type(param_type);
+					printf("Param - type %x\n", sig->argument_types[i]);
 					parse_node_ptr parameter = result.add_node("parameter");
 					parameter->set_property(&result, "name", NULL);
 					if(param_rep)
 					{
 						parse_node_ptr type_spec = result.add_node("locator_type_specifier");
 						type_spec->set_property(&result, "locator", result.add_c_string(param_rep->name.c_str()));
-						parameter->set_property(&result, "type_spec", type_spec);						
+						parameter->set_property(&result, "type_spec", type_spec);
 					}
 					else
 						parameter->set_property(&result, "type_spec", NULL);
 					parameters->append(parameter);
 				}
-				core::type_database::type_rep *return_rep = the_program._type_database.find_type(sig->return_type);
+				core::type_database::type_rep *return_rep = core::kt._type_database.find_type(sig->return_type);
 				if(return_rep)
 				{
 					parse_node_ptr type_spec = result.add_node("locator_type_specifier");
@@ -222,19 +223,21 @@ static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
 		}
 		p = p.next();
 	}
-	for(core::hash_table_flat<core::indexed_string, core::function_record *>::pointer fp = the_program._type_database._function_table.first(); fp; ++fp)
+	for(core::hash_table_flat<core::indexed_string, core::function_record *>::pointer fp = core::kt._type_database._function_table.first(); fp; ++fp)
 	{
 		const core::indexed_string *name = fp.key();
 		core::function_record *func = *(fp.value());
 		parse_node_ptr function_node = result.add_node("builtin_function");
 		function_node->set_property(&result, "name", result.add_c_string(name->c_str()));
+		printf("Adding function %s\n", name->c_str());
 		parse_node_ptr parameters = result.add_list(NULL);
 		function_node->set_property(&result, "parameter_list", parameters);
 		core::function_type_signature *sig = func->get_signature();
 		for(uint32 i = 0; i < sig->argument_count; i++)
 		{
 			core::type_record *param_type = sig->argument_types[i];
-			core::type_database::type_rep *param_rep = the_program._type_database.find_type(param_type);
+					printf("Param - type %x\n", sig->argument_types[i]);
+			core::type_database::type_rep *param_rep = core::kt._type_database.find_type(param_type);
 			
 			parse_node_ptr parameter = result.add_node("parameter");
 			parameter->set_property(&result, "name", NULL);
@@ -248,7 +251,7 @@ static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
 				parameter->set_property(&result, "type_spec", NULL);
 			parameters->append(parameter);
 		}
-		core::type_database::type_rep *return_rep = the_program._type_database.find_type(sig->return_type);
+		core::type_database::type_rep *return_rep = core::kt._type_database.find_type(sig->return_type);
 		if(return_rep)
 		{
 			parse_node_ptr type_spec = result.add_node("locator_type_specifier");
