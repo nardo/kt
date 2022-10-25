@@ -1,7 +1,7 @@
-LEX=/usr/local/bin/flex
-YACC=/usr/local/bin/bison
-CPPFLAGS=-I/usr/include/python2.7 -I../../ -I../standard_library
-LDFLAGS=-lpython2.7 -lstdc++ -framework Foundation
+LEX=/usr/bin/flex
+YACC=/usr/bin/bison
+CPPFLAGS=-I/Library/Frameworks/Python.framework/Headers -I../../ -I../standard_library
+LDFLAGS=-lpython -lstdc++ -framework Foundation
 python: main.o parser.o lexical_analyzer.o
 	$(CC) -o $@ $(LDFLAGS) $^
 

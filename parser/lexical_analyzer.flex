@@ -481,7 +481,7 @@ COMMENT		"//"[^\n\r]*
 
 %%
 
-//extern int kt_parse(kt_lexer *lexer, parse_result *result);
+extern int kt_parse(kt_lexer *lexer, parse_result *result);
 
 void parse_buffer(const char *parse_string, uint parse_string_len, parse_result &result)
 {

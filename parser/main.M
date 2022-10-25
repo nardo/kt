@@ -67,22 +67,22 @@ PyObject *kt_build_pyobject_tree(parse_node *tree, PyObject *script_object_class
 	{
 		case parse_node::type_node:
 			ret = PyObject_CallObject(script_object_class, NULL);
-			PyObject_SetAttrString(ret, "type", PyString_FromString(tree->name));
+			PyObject_SetAttrString(ret, "type", PyUnicode_FromString(tree->name));
 			for(parse_node_property *walk = tree->property_list_head; walk; walk = walk->next)
 				PyObject_SetAttrString(ret, walk->name, kt_build_pyobject_tree(walk->value, script_object_class));
 			return ret;
 			//// parse nodes become dictionaries:
 			//ret = PyDict_New();
-			//PyDict_SetItemString(ret, "type", PyString_FromString(tree->name));
+			//PyDict_SetItemString(ret, "type", PyUnicode_FromString(tree->name));
 			//for(parse_node_property *walk = tree->property_list_head; walk; walk = walk->next)
 			//	PyDict_SetItemString(ret, walk->name, kt_build_pyobject_tree(walk->value));
 			//return ret;
 		case parse_node::type_integer:
-			return PyInt_FromLong(tree->int_data);
+			return PyLong_FromLong(tree->int_data);
 		case parse_node::type_float:
 			return PyFloat_FromDouble(tree->float_data);
 		case parse_node::type_string:
-			return PyString_FromString(tree->string_data);
+			return PyUnicode_FromString(tree->string_data);
 		case parse_node::type_list:
 			ret = PyList_New(0);
 			for(parse_node *walk = tree->first; walk; walk = walk->next)
@@ -267,21 +267,47 @@ static PyObject *kt_query_builtins(PyObject *self, PyObject *args)
 	return return_tree;
 }
 
-static PyMethodDef kt_Methods[] = {
+static PyMethodDef kt_methods[] = {
     {"parse",  kt_parse_py, METH_VARARGS, "Parse a single kt script."},
     {"query_builtins",  kt_query_builtins, METH_VARARGS, "Returns a python object tree of builtin objects."},
 	{"objc_test", kt_objc_test_py, METH_VARARGS, "Test some objective C action!."},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
+static struct PyModuleDef kt_module =
+{
+    PyModuleDef_HEAD_INIT,
+    "kt", /* name of module */
+    "",          /* module documentation, may be NULL */
+    -1,          /* size of per-interpreter state of the module, or -1 if the module keeps state in global variables. */
+    kt_methods
+};
+
+PyMODINIT_FUNC
+PyInit_kt(void)
+{
+    return PyModule_Create(&kt_module);
+}
+
 int main (int argc, char *  argv[])
 {
 	 /* Pass argv[0] to the Python interpreter */
-    Py_SetProgramName(argv[0]);
-	
-    /* Initialize the Python interpreter.  Required. */
+    std::wstring app_name(argv[0], argv[0] + strlen(argv[0]));
+    Py_SetProgramName(app_name.data());
+
+    if (PyImport_AppendInittab("kt", PyInit_kt) == -1) {
+        fprintf(stderr, "Error: could not extend in-built modules table\n");
+        exit(1);
+        
+    }    /* Initialize the Python interpreter.  Required. */
     Py_Initialize();
-    Py_InitModule("kt", kt_Methods);
-	Py_Main(argc, argv);
+    
+    std::vector<std::wstring> args;
+    for(int i = 0; i < argc; i++)
+        args.push_back(std::wstring(argv[i], argv[i] + strlen(argv[i])));
+    std::vector<const wchar_t *> arg_array;
+    for(int i = 0; i < argc; i++)
+        arg_array.push_back(args[i].data());
+	Py_Main(argc, (wchar_t **) arg_array.data());
     return 0;
 }
