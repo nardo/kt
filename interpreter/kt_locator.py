@@ -86,7 +86,7 @@ def resolve_locator(enclosing_scope, locator_name, program_node):
 	# search the global compound
 	node = kt_globals.current_facet.find_node(enclosing_compound, locator_name)
 	if not node:
-		raise compile_error, (program_node, "locator " + locator_name + " not found.")
+		raise compile_error(program_node, "locator " + locator_name + " not found.")
 	locator_name_part = locator_name.rpartition('/')[2]
 	if node.is_compound():
 		location.locator_type = locator_types.reference
@@ -107,7 +107,7 @@ def resolve_locator(enclosing_scope, locator_name, program_node):
 		location.locator_type = locator_types.builtin_function
 		location.node = node
 	else:
-		raise compile_error, (program_node, "global node " + locator_name + " cannot be used as a locator.")
+		raise compile_error(program_node, "global node " + locator_name + " cannot be used as a locator.")
 	return location
 
 class node_locator_type_specifier(program_node):
@@ -120,7 +120,7 @@ class node_locator_type_specifier(program_node):
 		self.resolved_location = resolve_locator(scope, self.locator, self)
 		# verify that this location is a valid type
 		if self.resolved_location.locator_type < locator_types.reference:
-			raise compile_error, (self, "locator \"" + self.locator + "\" is not a valid type name.")
+			raise compile_error(self, "locator \"" + self.locator + "\" is not a valid type name.")
 		self.qualified_type = self.resolved_location.node.qualified_type
 
 	def get_qualified_type(self):

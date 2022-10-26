@@ -18,13 +18,13 @@ def kt():
 	#try:
 	file_tree = build_file_tree(root_tree)
 	facets = get_facet_set(file_tree)
-	print "Facets in test program: " + str(facets)
+	print("Facets in test program: " + str(facets))
 	sys.stdout.flush()
 	output_file = open(root_tree + "_output.cpp", "w")
 
 	facet_trees = {}
 	for facet_name in facets:
-		print "Processing facet: " + facet_name
+		print("Processing facet: " + facet_name)
 		new_facet = facet(facet_name, output_file)
 		new_facet.process(file_tree)
 	output_file.close()

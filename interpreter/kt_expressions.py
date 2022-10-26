@@ -12,7 +12,7 @@ def compile_void_expression(func, expr):
 
 class node_expression(program_node):
 	def analyze_lvalue(self, func, result_type_qualifier):
-		raise compile_error, (self, "Expression is not an l-value.")
+		raise compile_error(self, "Expression is not an l-value.")
 		pass
 	def compile(self, func, result_symbol, result_type_qualifier):
 		pass
@@ -40,7 +40,7 @@ class node_locator_expr(node_expression):
 
 	def analyze_lvalue(self, func, type_spec):
 		if self.location.locator_type > locator_types.last_lvalue:
-			raise compile_error, (self, "Symbol " + self.string + " was not found or cannot be assigned a value.")
+			raise compile_error(self, "Symbol " + self.string + " was not found or cannot be assigned a value.")
 
 	def compile(self, func, result_symbol, type_qual):
 		if self.location.get_type_qualifier().is_equivalent(type_qual):
@@ -65,7 +65,7 @@ class node_int_constant_expr(node_expression):
 		self.value = None
 	def analyze_expr_types(self, func, result_type_qualifier):
 		if not result_type_qualifier.is_numeric:
-			raise compile_error, (self, "integer constant expression is not valid here.")
+			raise compile_error(self, "integer constant expression is not valid here.")
 
 	def analyze_expr_linkage(self, func): pass
 	def compile(self, func, result_symbol, type_qual):
@@ -91,7 +91,7 @@ class node_float_constant_expr(node_expression):
 		self.value = None
 	def analyze_expr_types(self, func, result_type_qualifier):
 		if not result_type_qualifier.is_numeric():
-			raise compile_error, (self, "floating point constant expression is not valid here.")
+			raise compile_error(self, "floating point constant expression is not valid here.")
 	def get_preferred_type_qualifier(self, func):
 		return func.facet.type_dictionary.builtin_type_qualifier_float
 	def compile(self, func, result_symbol, type_spec):
@@ -106,7 +106,7 @@ class node_string_constant(node_expression):
 		self.value = None
 	def analyze_expr_types(self, func, result_type_qualifier):
 		if not result_type_qualifier.is_string:
-			raise compile_error, (self, "string constant expression is not valid here.")
+			raise compile_error(self, "string constant expression is not valid here.")
 		self.string_index = func.facet.add_string_constant(self.value)
 	def analyze_expr_linkage(self, func): pass
 	def get_preferred_type_qualifier(self, func):
@@ -127,7 +127,7 @@ class node_strcat_expr(node_expression):
 
 	def get_cat_str(self):
 		if self.op not in node_strcat_expr.op_table:
-			raise compile_error, (self, "Unknown string cat operator" + str(self.op))
+			raise compile_error(self, "Unknown string cat operator" + str(self.op))
 		return node_strcat_expr.op_table[self.op]
 	def analyze_expr_linkage(self, func):
 		self.left.analyze_expr_linkage(func)
@@ -171,7 +171,7 @@ class node_array_index_expr(node_expression):
 		self.resolved = 1
 		self.container_type = self.array_expr.get_preferred_type_qualifier(func)
 		if not self.container_type.is_container:
-			raise compile_error, (self, "this type is not a container.")
+			raise compile_error(self, "this type is not a container.")
 		self.container_value_type = self.container_type.container_value_type
 		self.container_key_type = self.container_type.container_key_type
 
@@ -222,12 +222,12 @@ class node_func_call_expr(node_expression):
 	def analyze_expr_types(self, func, result_type_qualifier):
 		func_type = self.func_expr.get_preferred_type_qualifier(func)
 		if not func_type.is_callable:
-			raise compile_error, (self, "expression cannot be called as a function.")
+			raise compile_error(self, "expression cannot be called as a function.")
 		self.func_expr.analyze_expr_types(func, func_type)
 		if func_type.callable_has_signature():
 			type_list = func_type.get_callable_parameter_types()
 			if len(self.args) != len(type_list):
-				raise compile_error, (self, "Wrong number of arguments in function call.")
+				raise compile_error(self, "Wrong number of arguments in function call.")
 			for arg, type in zip(self.args, type_list):
 				arg.analyze_expr_types(func, type)
 		else:
@@ -250,7 +250,7 @@ class node_func_call_expr(node_expression):
 			if result_symbol is None:
 				result_symbol = func.add_register(type_qual)
 			if callable_return_type.type_kind == type_qualifier.kind.none_type:
-				raise compile_error, (self, "Assigning value from function that returns none.")
+				raise compile_error(self, "Assigning value from function that returns none.")
 			return_register = result_symbol
 			if not type_qual.is_equivalent(callable_return_type):
 				return_register = func.add_register(callable_return_type)
@@ -287,7 +287,7 @@ class node_method_call(node_func_call_expr):
 		if not self.resolved:
 			args = [pair.expr for pair in self.selector_list]
 			sel_str = self.primary_name + "".join(str(pair.string if pair.string is not None else "") + ":" for pair in self.selector_list )
-			print "Got selector: " + sel_str
+			print("Got selector: " + sel_str)
 			self.func_expr = node_slot_expr()
 			self.func_expr.object_expr = self.object_expr
 			self.func_expr.slot_name = sel_str
@@ -311,21 +311,21 @@ class node_slot_expr(node_expression):
 			if object_expr.__class__ == node_locator_expr and object_expr.string == 'parent':
 				self.is_parent_reference = True
 				if not func.compound:
-					raise compile_error, (self, "Function has no compound.")
+					raise compile_error(self, "Function has no compound.")
 				parent_node = func.compound.parent_node
 				if parent_node is None:
-					raise compile_error, (self, "compound " + func.compound.name + " has no declared parent.")
+					raise compile_error(self, "compound " + func.compound.name + " has no declared parent.")
 				if self.slot_name not in parent_node.members:
-					raise compile_error, (self, "Parent of " + func.compound.name + " has no member named " + self.slot_name)
+					raise compile_error(self, "Parent of " + func.compound.name + " has no member named " + self.slot_name)
 				slot = parent_node.members[self.slot_name]
 				if slot.type != 'function':
-					raise compile_error, (self, "parent expression must reference a function.")
+					raise compile_error(self, "parent expression must reference a function.")
 				self.parent_function = slot.function_decl
 				self.slot_type = self.parent_function.get_type_signature()
 			else:
 				self.compound_type = self.object_expr.get_preferred_type_spec()
 				if not self.compound_type.is_compound():
-					raise compile_error, (self, "Field access not allowed on this type.")
+					raise compile_error(self, "Field access not allowed on this type.")
 				members = self.compound_type.get_compound_members()
 				if members is None:
 					# if the compound members cannot be determined we'll resolve dynamically
@@ -333,7 +333,7 @@ class node_slot_expr(node_expression):
 					self.dynamic_lookup = True
 				else:
 					if self.slot_name not in members:
-						raise compile_error, (self, "Slot " + self.slot_name + " is not a valid member.")
+						raise compile_error(self, "Slot " + self.slot_name + " is not a valid member.")
 					self.slot_type = members[self.slot_name].type_spec
 	def get_preferred_type_spec(self, func):
 		self.resolve(func)
@@ -342,7 +342,7 @@ class node_slot_expr(node_expression):
 		self.resolve(func)
 		if self.is_parent_reference:
 			if not type_spec.is_equivalent(self.slot_type):
-				raise compile_error, (self, "Parent function reference cannot be converted to a different type")
+				raise compile_error(self, "Parent function reference cannot be converted to a different type")
 		else:
 			self.object_expr.analyze(func, self.compound_type)
 			self.slot_type.check_conversion(type_spec)
@@ -372,7 +372,7 @@ class node_slot_expr(node_expression):
 				return result_symbol
 	def analyze_lvalue(self, func, return_type_spec):
 		if self.is_parent_reference:
-			raise compile_error, (self, "Parent call slot reference cannot be used as an l-value")
+			raise compile_error(self, "Parent call slot reference cannot be used as an l-value")
 		self.object_expr.analyze(func, self.compound_type)
 		self.slot_type.check_conversion(return_type_spec)
 	def compile_lvalue(self, func):
@@ -395,7 +395,7 @@ class node_unary_lvalue_op_expr(node_expression):
 	def analyze(self, func, type_spec):
 		self.expression.analyze_lvalue(func, type_spec)
 		if not self.expression.get_preferred_type_spec(func).is_numeric():
-			raise compile_error, (self, "Cannot apply a unary operation to a non-numeric expression")
+			raise compile_error(self, "Cannot apply a unary operation to a non-numeric expression")
 	def compile(self, func, return_symbol, type_spec):
 		expression_symbol, expression_type = self.expression.compile_lvalue(func)
 		# op can be one of pre_increment, post_increment, pre_decrement, post_decrement
@@ -430,7 +430,7 @@ class node_unary_minus_expr(node_expression):
 	def analyze(self, func, type_spec):
 		self.expression.analyze(func, type_spec)
 		if not self.expression.get_preferred_type_spec(func).is_numeric():
-			raise compile_error, (self, "Cannot negate a non-numeric expression")
+			raise compile_error(self, "Cannot negate a non-numeric expression")
 
 	def compile(self, func, return_symbol, type_spec):
 		expression_type = self.expression.get_preferred_type_spec(func)
@@ -455,7 +455,7 @@ class node_logical_not_expr(node_expression):
 	def analyze(self, func, type_spec):
 		expression_type = self.expression.get_preferred_type_spec(func)
 		if not expression_type.is_numeric():
-			raise compile_error, (self, "Cannot apply a logical not to a non-numeric expression")
+			raise compile_error(self, "Cannot apply a logical not to a non-numeric expression")
 		self.expression.analyze(func, expression_type)
 		func.facet.builtin_type_spec_boolean.check_conversion(type_spec)
 	def compile(self, func, return_symbol, type_spec):
@@ -732,13 +732,13 @@ class node_array_expr(node_expression):
 		return func.facet.builtin_type_spec_variable
 	def analyze(self, func, type_spec):
 		if not type_spec.is_container():
-			raise compile_error, (self, "object is not a container.")
+			raise compile_error(self, "object is not a container.")
 		if not type_spec.is_container_sequential():
-			raise compile_error, (self, "array can only be assigned to sequentially accessable containers (arrays).")
+			raise compile_error(self, "array can only be assigned to sequentially accessable containers (arrays).")
 		container_size = type_spec.get_container_size()
 		if container_size != "variable":
 			if len(self.array_values) != container_size:
-				raise compile_error, (self, "expecting " + container_size + " array value initializers; got " + len(self.array_values))
+				raise compile_error(self, "expecting " + container_size + " array value initializers; got " + len(self.array_values))
 		value_type = type_spec.get_container_value_type()
 		for sub_expr in self.array_values:
 			sub_expr.analyze(func, value_type)
@@ -759,10 +759,10 @@ class node_map_expr(node_expression):
 		return func.facet.builtin_type_spec_variable
 	def analyze(self, func, type_spec):
 		if not type_spec.is_container():
-			raise compile_error, (self, "object is not a container.")
+			raise compile_error(self, "object is not a container.")
 		container_size = type_spec.get_container_size()
 		if container_size != "variable":
-			raise compile_error, (self, "maps cannot be assigned to fixed arrays")
+			raise compile_error(self, "maps cannot be assigned to fixed arrays")
 		key_type = type_spec.get_container_key_type()
 		value_type = type_spec.get_container_value_type()
 		for pair in self.map_pairs:

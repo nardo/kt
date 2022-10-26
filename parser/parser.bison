@@ -1353,5 +1353,8 @@ void kt_error (struct YYLTYPE *loc, kt_lexer *lexer, parse_result *result, const
 	result->error_column_number = loc->first_column;
 }
 
-
+void parser_init()
+{
+    yydebug = 1;
+}
 

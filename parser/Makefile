@@ -12,13 +12,13 @@ parser.o: parser.cpp parser_interface.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ -c parser.cpp
 
 parser.cpp: parser.bison
-	$(YACC) parser.bison
+	$(YACC) --debug parser.bison
 
 lexical_analyzer.o: lexical_analyzer.cpp
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ -c lexical_analyzer.cpp
 
 lexical_analyzer.cpp: lexical_analyzer.flex
-	$(LEX) $(LFLAGS) -o $@ lexical_analyzer.flex
+	$(LEX) $(LFLAGS) --debug -o $@ lexical_analyzer.flex
 
 clean:
 	rm python *.o lexical_analyzer.cpp parser.cpp parser.hpp parser.output

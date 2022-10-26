@@ -3,14 +3,14 @@ __author__ = 'markf'
 # general error exception thrown by the compiler if given incorrect input
 class compile_error:
 	def __init__(self, node_where, error_string):
-		print error_string
+		print(error_string)
 		self.fail = self.foo
 		self.node_where = node_where
 		self.error_string = error_string
 
 # output a warning message during the compile process
 def compiler_warning(node_where, warning_string):
-	print "Warning!: " + warning_string
+	print("Warning!: " + warning_string)
 
 def goto_label(label_id):
 	return "goto _gt_l" + str(label_id) + ";\n"
@@ -51,7 +51,7 @@ class program_node(object):
 			elif node.__class__ == list:
 				return "( " + ", ".join( (dump_element(x, level + 1, visited_set) for x in node) ) + " )"
 			elif node.__class__ == dict:
-				return "{" + "".join("\n" + " " * (level * 2 + 2) + str (key) + dump_element(value, level + 2, visited_set) for key, value in node.iteritems())+ "\n" + " " * (level * 2) + "}"
+				return "{" + "".join("\n" + " " * (level * 2 + 2) + str (key) + dump_element(value, level + 2, visited_set) for key, value in node.items())+ "\n" + " " * (level * 2) + "}"
 			elif issubclass(node.__class__, program_node):
 				return dump_node(node, level, visited_set)
 			elif node.__class__ == str:

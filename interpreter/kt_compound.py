@@ -63,7 +63,7 @@ class compound_node (program_node):
 		if self.members_origin_node != self:
 			self.copy_member_info()
 		if self.find_slot(element.name) is not None:
-			raise compile_error, (element, "Variable " + element.name + " already declared.")
+			raise compile_error(element, "Variable " + element.name + " already declared.")
 		self.members[element.name] = compound_member(self, compound_member_types.slot, element.name, self.slot_count, element.type_spec, None)
 		self.slot_count += 1
 		if element.assign_expr is not None:
@@ -77,7 +77,7 @@ class compound_node (program_node):
 		if parent_func:
 			#todo: check that the parent_func is not actually declared in this node (multiple definition)
 			if parent_func.type != 'function':
-				raise compile_error, (function_node, "Function " + name + " of " + function_node.name + " is already declared as a nonfunction")
+				raise compile_error(function_node, "Function " + name + " of " + function_node.name + " is already declared as a nonfunction")
 			vtable_index = parent_func.vtable_index
 			parent_func.has_override = True
 		else:
@@ -99,15 +99,15 @@ class compound_node (program_node):
 		if 'body' in self.__dict__:
 			for assignment in (v for v in self.body if v.__class__ == node_slot_assignment):
 				if assignment.name not in self.members:
-					raise compile_error, (self, "Compound " + self.name + " does not have a slot named " + assignment.name)
+					raise compile_error(self, "Compound " + self.name + " does not have a slot named " + assignment.name)
 				else:
 					the_slot = self.members[assignment.name]
 					if the_slot.type != slot.variable_slot:
-						raise compile_error, (self, "Member " + assignment.name + " of " + self.name + " is not an assignable slot.")
+						raise compile_error(self, "Member " + assignment.name + " of " + self.name + " is not an assignable slot.")
 					self.add_constructor_assignment(the_slot.index, assignment.assign_expr)
-		print "Compound " + self.name + ":"
-		for slot_name, the_slot in self.members.iteritems():
-			print the_slot
+		print("Compound " + self.name + ":")
+		for slot_name, the_slot in self.members.items():
+			print(the_slot)
 		#for assignment in node.assignments:
 		#	print "  Assigns variable slot: " + str(assignment.slot_index) + " assign: " + str(assignment.assign_expr)
 		if len(self.assignments):
@@ -134,15 +134,15 @@ class compound_node (program_node):
 
 	def connect_parentage_and_sort_compounds(self, the_facet):
 		if self.parentage_process == 1:
-			raise compile_error, (self, "Error - compound " + self.name + " cannot be its own ancestor")
+			raise compile_error(self, "Error - compound " + self.name + " cannot be its own ancestor")
 		elif self.parentage_process == 2:
 			return
 		self.parentage_process = 1
 		if 'parent_decl' in self.__dict__ and self.parent_decl.name is not None:
-			print "node: " + self.name + " has parent: " + self.parent_decl.name
+			print("node: " + self.name + " has parent: " + self.parent_decl.name)
 			parent_node = the_facet.find_node(self, self.parent_decl.name)
 			if parent_node is None:
-				raise compile_error, (self, "Could not find parent " + parent + " for compound " + self.name)
+				raise compile_error(self, "Could not find parent " + parent + " for compound " + self.name)
 			else:
 				parent_node.connect_parentage_and_sort_compounds(the_facet)
 			self.parent_node = parent_node
@@ -166,7 +166,7 @@ class compound_node (program_node):
 				self.add_member_function(element)
 
 		self.build_constructor()
-		print "node " + self.name + " processed - booyaka"
+		print("node " + self.name + " processed - booyaka")
 
 	def assign_qualified_type(self, the_facet):
 		# assign type_qualifiers for this compound

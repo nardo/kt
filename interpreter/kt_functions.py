@@ -37,7 +37,7 @@ class function_base (program_node):
 		return "__closure__" + self.c_name
 
 	def analyze_signature_types(self):
-		print "Analyzing signature of " + self.name
+		print("Analyzing signature of " + self.name)
 		enclosing_scope = self.compound if self.compound is not None else self.prev_scope
 
 		for arg in self.parameter_list:
@@ -118,17 +118,17 @@ class node_function (function_base):
 
 	def add_local_variable(self, ref_node, var_name, var_type_spec):
 		if var_name in self.symbols:
-			raise compile_error, (ref_node, "Variable " + var_name + " is declared more than once.")
+			raise compile_error(ref_node, "Variable " + var_name + " is declared more than once.")
 		self.symbols[var_name] = compound_member(ref_node, compound_member_types.slot, var_name, self.local_variable_count, var_type_spec)
 		self.local_variable_count += 1
-		print "Var decl: " + var_name
+		print("Var decl: " + var_name)
 
 	def add_child_function(self, func):
 		func.prev_scope = self
 		self.facet.add_function(func)
 
 		if func.name in self.symbols:
-			raise compile_error, (func, "Symbol " + func.name + " is already declared in this scope.")
+			raise compile_error(func, "Symbol " + func.name + " is already declared in this scope.")
 
 		self.symbols[func.name] = compound_member(self, compound_member_types.function, func.name, len(self.child_functions), None, func)
 		self.child_functions.append(func)
@@ -148,27 +148,27 @@ class node_function (function_base):
 	# registers are allocated during the compile step, but must be declared sequentially before the function's code.
 
 	def analyze_function_structure(self):
-		print "..analyzing function structure of " + self.name
+		print("..analyzing function structure of " + self.name)
 		if len(self.statements) == 0 or self.statements[-1].__class__ is not node_return_stmt:
 			return_stmt_decl = node_return_stmt()
 			return_stmt_decl.return_expression_list = []
 			self.statements.append(return_stmt_decl)
 		self.analyze_block_structure(self.statements)
-		print self.name + " - structure analysis complete"
+		print(self.name + " - structure analysis complete")
 
 	def analyze_function_linkage(self):
-		print "..analyzing function linkage of " + self.name
+		print("..analyzing function linkage of " + self.name)
 		return_stmt_decl = None
 		for arg in self.parameter_list:
 			if arg.name in self.symbols:
-				raise compile_error, (self, "Argument " + arg.name + " is declared more than once.")
+				raise compile_error(self, "Argument " + arg.name + " is declared more than once.")
 			arg.member = compound_member(self, compound_member_types.parameter, arg.name, self.arg_count, arg.type_spec)
 			self.symbols[arg.name] = arg.member
 			self.arg_count += 1
 			#print "Arg: " + arg
 
 		self.analyze_block_linkage(self.statements)
-		print self.name + " - linkage analysis complete"
+		print(self.name + " - linkage analysis complete")
 
 	def analyze_types(self):
 		if self.types_analyzed:
@@ -177,9 +177,9 @@ class node_function (function_base):
 		for member in self.symbols.values():
 			member.assign_qualified_type(self)
 
-		print "..analyzing types of function " + self.name
+		print("..analyzing types of function " + self.name)
 		self.analyze_block_types(self.statements)
-		print self.name + " - types analysis complete"
+		print(self.name + " - types analysis complete")
 
 	def analyze_block_linkage(self, statement_list):
 		for stmt in statement_list:

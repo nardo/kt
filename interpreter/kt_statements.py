@@ -4,7 +4,7 @@ from kt_expressions import *
 class node_continue_stmt(program_node):
 	def analyze_stmt_structure(self, func):
 		if func.loop_count == 0:
-			raise compile_error, (self, "continue not allowed outside of a loop.")
+			raise compile_error(self, "continue not allowed outside of a loop.")
 	def analyze_stmt_linkage(self, func):
 		pass
 	def analyze_stmt_types(self, func):
@@ -15,7 +15,7 @@ class node_continue_stmt(program_node):
 class node_break_stmt(program_node):
 	def analyze_stmt_structure(self, func):
 		if func.loop_count == 0 and func.switch_count == 0:
-			raise compile_error, (self, "break not allowed outside of a loop or switch.")
+			raise compile_error(self, "break not allowed outside of a loop or switch.")
 	def analyze_stmt_linkage(self, func):
 		pass
 	def analyze_stmt_types(self, func):
@@ -40,9 +40,9 @@ class node_return_stmt(program_node):
 
 	def analyze_stmt_types(self, func):
 		if func.return_type_qualifier == func.facet.type_dictionary.builtin_type_qualifier_none and self.return_expression is not None:
-			raise compile_error, (self, "Function returning none cannot return a value")
+			raise compile_error(self, "Function returning none cannot return a value")
 		if func.return_type_qualifier != func.facet.type_dictionary.builtin_type_qualifier_none and self.return_expression is None:
-			raise compile_error, (self, "Function should return a value here")
+			raise compile_error(self, "Function should return a value here")
 
 		if self.return_expression is not None:
 			self.return_expression.analyze_expr_types(func, func.return_type)

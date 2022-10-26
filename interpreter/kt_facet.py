@@ -97,25 +97,25 @@ class facet:
 		self.find_node(None, "/builtins/variable").qualified_type = self.type_dictionary.builtin_type_qualifier_variable
 		self.type_dictionary.builtin_type_qualifier_variable.c_name = "kt_program::variable"
 
-		print "Globals: " + str(" ".join(g.name for g in self.globals_list))
+		print("Globals: " + str(" ".join(g.name for g in self.globals_list)))
 
 		# the program tree is processed as follows:
 		# 1. Process all compound definitions - build the derivation hierarchy and membership of all compounds
 		# 2. Process all function definitions - build local variable lists, and translate statement structure into linear operation instruction lists
 		# 3. Qualify the types of all program variables and structures. type id and type_qualifier for
 
-		print "Analyzing Compound Structures"
+		print("Analyzing Compound Structures")
 		for c in (x for x in self.globals_list if x.is_compound()):
 			c.connect_parentage_and_sort_compounds(self)
 		for c in self.sorted_compounds:
 			c.analyze_compound_structure(self)
 		sys.stdout.flush()
 
-		print "Assigning Compound Types"
+		print("Assigning Compound Types")
 		for c in self.sorted_compounds:
 			c.assign_qualified_type(self)
 
-		print "Analyzing Function Structure"
+		print("Analyzing Function Structure")
 		for func in self.functions:
 			func.analyze_function_structure()
 
@@ -124,29 +124,29 @@ class facet:
 		for f in (x for x in self.globals_list if x.__class__ == node_builtin_function):
 			f.resolve_c_name()
 
-		print "Analyzing Function Linkage"
+		print("Analyzing Function Linkage")
 		for func in self.functions:
 			func.analyze_function_linkage()
 
-		print "Analyzing Function Signatures"
+		print("Analyzing Function Signatures")
 		for func in self.functions:
 			func.analyze_signature_types()
 		for f in (x for x in self.globals_list if x.__class__ == node_builtin_function):
 			f.analyze_signature_types()
 
-		print "Analyzing Compound Member Types"
+		print("Analyzing Compound Member Types")
 		for c in self.sorted_compounds:
 			c.analyze_compound_types(self)
 
 		sys.stdout.flush()
 		sys.stderr.flush()
 
-		print "Analyzing Function Types"
+		print("Analyzing Function Types")
 		for func in self.functions:
 			func.analyze_types()
 		sys.stdout.flush()
 
-		print "Facet compiles to:\n"
+		print("Facet compiles to:\n")
 		self.emit_standard_includes()
 		self.emit_code("namespace core {\n")
 		#self.emit_code("static kt_program kt;\n")
@@ -228,7 +228,7 @@ class facet:
 				node = new_node
 			path = path[2].partition('/')
 		if node.contents.has_key(path[0]):
-			raise compile_error, (None, "duplicate addition of builtin node: " + path[0])
+			raise compile_error(None, "duplicate addition of builtin node: " + path[0])
 		the_node.name = path[0]
 		the_node.compound = node
 		node.contents[path[0]] = the_node
@@ -242,8 +242,8 @@ class facet:
 
 	def find_node(self, search_node, parent_name, filter_func = lambda x: True ):
 		parent_part = parent_name.partition('/')
-		if len(parent_part[0]) > 0 and not self.globals.has_key(parent_part[0]):
-			print "Error, node named " + parent_part[0] + " is not in facet " + self.facet_name
+		if len(parent_part[0]) > 0 and parent_part[0] not in self.globals:
+			print("Error, node named " + parent_part[0] + " is not in facet " + self.facet_name)
 			return None
 		else:
 			if len(parent_part[0]) == 0:
@@ -257,7 +257,7 @@ class facet:
 				leaf_node = node
 				while remainder_path != "":
 					sub_path = remainder_path.partition('/')
-					if leaf_node.contents.has_key(sub_path[0]):
+					if sub_path[0] in leaf_node.contents:
 						leaf_node = leaf_node.contents[sub_path[0]]
 						remainder_path = sub_path[2]
 					else:

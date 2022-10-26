@@ -43,14 +43,14 @@ def build_file_tree(root_path):
                 node.contents[file] = file_node
                 recurse_directory(file_node, file_path)
             elif file.endswith('.kt'):
-                print "Compiling ... " + file_path
+                print("Compiling ... " + file_path)
                 kt_file = open(file_path, "rb")
                 text = kt_file.read()
-                print text
+                print(text)
                 kt_file.close()
                 parse_result = kt.parse(text, ast_node)
-                print parse_result
-                print dump_ast(parse_result, 0)
+                print(parse_result)
+                print(dump_ast(parse_result, 0))
                 node.contents[file] = file_tree_node(file, 'kt', parse_result)
             else:
                 node.contents[file] = file_tree_node(file, 'resource', None)

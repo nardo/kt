@@ -116,7 +116,7 @@ public:
 		return yylex();
 	}
 protected:
-	int LexerInput( char* buf, int max_size )
+	size_t LexerInput( char* buf, size_t max_size )
 	{
 		uint max_bytes = _parse_string_len - _parse_string_index;
 		if(max_bytes > max_size)
@@ -488,4 +488,3 @@ void parse_buffer(const char *parse_string, uint parse_string_len, parse_result 
 	kt_lexer lexer(parse_string, parse_string_len, &result);
 	kt_parse(&lexer, &result);
 }
-

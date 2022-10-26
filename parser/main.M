@@ -97,9 +97,9 @@ static PyObject *kt_parse_py(PyObject *self, PyObject *args)
 	const char *script_data;
 	PyObject *script_object_class;
 	printf("** test 1 ** \n");
-	if(!PyArg_ParseTuple(args, "sO", &script_data, &script_object_class))
+	if(!PyArg_ParseTuple(args, "yO", &script_data, &script_object_class))
 		return NULL;
-	printf("** test 2 ** \n");
+	printf("** test 2 ** %s\n", script_data);
 		
 	uint len = strlen(script_data);
 	parse_result result;
@@ -289,8 +289,11 @@ PyInit_kt(void)
     return PyModule_Create(&kt_module);
 }
 
+extern void parser_init();
+
 int main (int argc, char *  argv[])
 {
+    parser_init();
 	 /* Pass argv[0] to the Python interpreter */
     std::wstring app_name(argv[0], argv[0] + strlen(argv[0]));
     Py_SetProgramName(app_name.data());
