@@ -12,9 +12,9 @@ class type_qualifier:
 		function_type = 6
 		array_type = 7
 		map_type = 8
-	def __init__(self, kind):
+	def __init__(self, kind_id):
 		self.id = -1
-		self.type_kind = kind
+		self.type_kind = kind_id
 		self.return_type = None
 		self.is_callable = False
 		self.parameter_type_list = None
@@ -39,7 +39,7 @@ class type_qualifier:
 			return "V"
 		elif self.type_kind == type_qualifier.kind.basic_type:
 			return "B" + "S" if self.is_string else ("I" if self.is_integer else "F" + str(self.bit_width))
-		elif self.type_kind >= type_qualifier.kind.class_type and self.kind <= type_qualifier.kind.record_instance_type:
+		elif self.type_kind >= type_qualifier.kind.class_type and self.type_kind <= type_qualifier.kind.record_instance_type:
 			return "R" + str(self.kind) + "_" + str(self.compound.compound_id)
 		elif self.type_kind == type_qualifier.kind.function_type:
 			return "F(" + ("C" if self.needs_closure else "N") + "," + "," + ",".join(x.get_type_string() for x in self.parameter_type_list) + ")->(" + self.return_type.get_type_string() + ")"
